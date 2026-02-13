@@ -177,4 +177,4 @@ All routes wired: `/`, `/login`, `/track/:shareableId`, `/upload`, `/profile`, `
 - Collaborator roles (viewer/commenter/editor — only basic access grant/revoke exists)
 
 **Tooling:**
-- ESLint configuration (no `.eslintrc` at project root; `npm run lint` fails)
+- ~~ESLint configuration~~ — Done (`.eslintrc.cjs`, `.eslintignore`)

@@ -82,7 +82,7 @@ export function TrackPage() {
         <div className="container mx-auto px-4 py-24 text-center">
           <h1 className="text-2xl font-bold mb-4">Track Not Found</h1>
           <p className="text-studio-text-secondary mb-6">
-            This track doesn't exist or you don't have permission to view it.
+            This track doesn&apos;t exist or you don&apos;t have permission to view it.
           </p>
           <Link to="/login" className="text-studio-accent hover:underline">
             Sign in to access private tracks

@@ -67,7 +67,7 @@ export function Profile() {
             <div className="card text-center py-12">
               <Music className="w-16 h-16 mx-auto mb-4 text-studio-gray" />
               <p className="text-studio-text-secondary mb-4">
-                You haven't uploaded any tracks yet.
+                You haven&apos;t uploaded any tracks yet.
               </p>
               <Link
                 to="/upload"

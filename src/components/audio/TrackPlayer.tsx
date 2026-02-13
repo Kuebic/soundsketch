@@ -52,6 +52,7 @@ export function TrackPlayer({
       if (!isPlaying) playPause();
       onSeekComplete?.();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seekToTime]);
 
   if (urlLoading) {
