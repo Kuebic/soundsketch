@@ -9,10 +9,6 @@ interface UseWaveformOptions {
   onFinish?: () => void;
 }
 
-/**
- * Hook to manage Wavesurfer.js lifecycle with proper cleanup
- * CRITICAL: Always destroys instance in cleanup to prevent memory leaks
- */
 export function useWaveform({
   audioUrl,
   containerRef,
@@ -25,7 +21,14 @@ export function useWaveform({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
-  // Initialize Wavesurfer
+  // Store callbacks in refs to avoid re-initializing WaveSurfer when they change
+  const onReadyRef = useRef(onReady);
+  const onTimeUpdateRef = useRef(onTimeUpdate);
+  const onFinishRef = useRef(onFinish);
+  onReadyRef.current = onReady;
+  onTimeUpdateRef.current = onTimeUpdate;
+  onFinishRef.current = onFinish;
+
   useEffect(() => {
     if (!containerRef.current || !audioUrl) return;
 
@@ -46,7 +49,7 @@ export function useWaveform({
 
     wavesurfer.on('ready', () => {
       setDuration(wavesurfer.getDuration());
-      onReady?.();
+      onReadyRef.current?.();
     });
 
     wavesurfer.on('play', () => setIsPlaying(true));
@@ -54,22 +57,21 @@ export function useWaveform({
 
     wavesurfer.on('timeupdate', (time) => {
       setCurrentTime(time);
-      onTimeUpdate?.(time);
+      onTimeUpdateRef.current?.(time);
     });
 
     wavesurfer.on('finish', () => {
       setIsPlaying(false);
-      onFinish?.();
+      onFinishRef.current?.();
     });
 
     wavesurferRef.current = wavesurfer;
 
-    // CRITICAL: Cleanup to prevent memory leaks
     return () => {
       wavesurfer.destroy();
       wavesurferRef.current = null;
     };
-  }, [audioUrl, containerRef, onReady, onTimeUpdate, onFinish]);
+  }, [audioUrl, containerRef]);
 
   const playPause = () => {
     wavesurferRef.current?.playPause();
