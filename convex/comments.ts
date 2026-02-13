@@ -29,7 +29,7 @@ export const create = mutation({
 
       if (user) {
         authorId = user._id;
-        authorName = user.name;
+        authorName = user.name ?? "Anonymous";
       }
     }
 
@@ -132,7 +132,7 @@ export const deleteComment = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .withIndex("by_token_identifier", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
       .first();
 
     if (!user) throw new Error("User not found");
@@ -167,7 +167,7 @@ export const updateComment = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .withIndex("by_token_identifier", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
       .first();
 
     if (!user) throw new Error("User not found");

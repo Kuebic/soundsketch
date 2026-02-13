@@ -3,6 +3,25 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { Button } from '../ui/Button';
 import { Loader2 } from 'lucide-react';
 
+function getFriendlyError(err: unknown, isSignUp: boolean): string {
+  const message = err instanceof Error ? err.message : "";
+
+  if (message.includes("Invalid password") || message.includes("InvalidSecret"))
+    return "Incorrect password. Please try again.";
+  if (message.includes("Could not find user") || message.includes("InvalidAccountId"))
+    return "No account found with that email.";
+  if (message.includes("already exists") || message.includes("UniqueError"))
+    return "An account with that email already exists. Try logging in instead.";
+  if (message.includes("rate limit") || message.includes("RateLimited"))
+    return "Too many attempts. Please wait a moment and try again.";
+  if (message.includes("Server Error") || message.includes("Index") || message.includes("Uncaught"))
+    return "Something went wrong on our end. Please try again later.";
+
+  return isSignUp
+    ? "Could not create account. Please try again."
+    : "Could not sign in. Please try again.";
+}
+
 export function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,7 +42,7 @@ export function LoginForm() {
         flow: isSignUp ? "signUp" : "signIn"
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : isSignUp ? "Sign up failed" : "Login failed");
+      setError(getFriendlyError(err, isSignUp));
     } finally {
       setLoading(false);
     }

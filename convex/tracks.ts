@@ -17,7 +17,7 @@ export const create = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .withIndex("by_token_identifier", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
       .first();
 
     if (!user) throw new Error("User not found");
@@ -29,7 +29,7 @@ export const create = mutation({
       title: args.title,
       description: args.description,
       creatorId: user._id,
-      creatorName: user.name,
+      creatorName: user.name ?? "Unknown",
       isPublic: args.isPublic,
       shareableId,
       latestVersionId: undefined,
@@ -112,7 +112,7 @@ export const updatePrivacy = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .withIndex("by_token_identifier", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
       .first();
 
     if (track.creatorId !== user?._id) {
@@ -135,7 +135,7 @@ export const getMyTracks = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .withIndex("by_token_identifier", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
       .first();
 
     if (!user) return [];
@@ -164,7 +164,7 @@ export const deleteTrack = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .withIndex("by_token_identifier", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
       .first();
 
     if (track.creatorId !== user?._id) {
