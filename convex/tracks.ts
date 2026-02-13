@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { nanoid } from "nanoid";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 /**
  * Create a new track
@@ -12,14 +13,10 @@ export const create = mutation({
     isPublic: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token_identifier", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .first();
-
+    const user = await ctx.db.get(userId);
     if (!user) throw new Error("User not found");
 
     const shareableId = nanoid(10); // Short unique ID for URLs
@@ -69,22 +66,15 @@ export const getByShareableId = query({
 
     // Check access permissions for private tracks
     if (!track.isPublic) {
-      const identity = await ctx.auth.getUserIdentity();
-      if (!identity) return null;
-
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_token_identifier", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-        .first();
-
-      if (!user) return null;
+      const userId = await getAuthUserId(ctx);
+      if (!userId) return null;
 
       // Check if user is creator or has explicit access
-      const isCreator = track.creatorId === user._id;
+      const isCreator = track.creatorId === userId;
       const hasAccess = await ctx.db
         .query("trackAccess")
         .withIndex("by_track_and_user", (q) =>
-          q.eq("trackId", track._id).eq("userId", user._id)
+          q.eq("trackId", track._id).eq("userId", userId)
         )
         .first();
 
@@ -104,18 +94,13 @@ export const updatePrivacy = mutation({
     isPublic: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
 
     const track = await ctx.db.get(args.trackId);
     if (!track) throw new Error("Track not found");
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token_identifier", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .first();
-
-    if (track.creatorId !== user?._id) {
+    if (track.creatorId !== userId) {
       throw new Error("Not authorized");
     }
 
@@ -130,19 +115,12 @@ export const updatePrivacy = mutation({
  */
 export const getMyTracks = query({
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token_identifier", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .first();
-
-    if (!user) return [];
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
 
     return ctx.db
       .query("tracks")
-      .withIndex("by_creator", (q) => q.eq("creatorId", user._id))
+      .withIndex("by_creator", (q) => q.eq("creatorId", userId))
       .order("desc")
       .collect();
   },
@@ -156,18 +134,13 @@ export const deleteTrack = mutation({
     trackId: v.id("tracks"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
 
     const track = await ctx.db.get(args.trackId);
     if (!track) throw new Error("Track not found");
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token_identifier", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .first();
-
-    if (track.creatorId !== user?._id) {
+    if (track.creatorId !== userId) {
       throw new Error("Not authorized");
     }
 

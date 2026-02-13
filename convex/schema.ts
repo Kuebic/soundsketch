@@ -16,10 +16,8 @@ export default defineSchema({
     isAnonymous: v.optional(v.boolean()),
     // Custom fields
     avatarUrl: v.optional(v.string()),
-    tokenIdentifier: v.optional(v.string()),
   })
-    .index("email", ["email"])
-    .index("by_token_identifier", ["tokenIdentifier"]),
+    .index("email", ["email"]),
 
   tracks: defineTable({
     title: v.string(),

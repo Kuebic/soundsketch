@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 /**
  * Create a new comment (timestamp or general)
@@ -17,16 +18,12 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     // Allow guest comments on public tracks
-    const identity = await ctx.auth.getUserIdentity();
+    const userId = await getAuthUserId(ctx);
     let authorId: Id<"users"> | undefined;
     let authorName = "Anonymous";
 
-    if (identity) {
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_token_identifier", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-        .first();
-
+    if (userId) {
+      const user = await ctx.db.get(userId);
       if (user) {
         authorId = user._id;
         authorName = user.name ?? "Anonymous";
@@ -127,23 +124,16 @@ export const getReplies = query({
 export const deleteComment = mutation({
   args: { commentId: v.id("comments") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token_identifier", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .first();
-
-    if (!user) throw new Error("User not found");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
 
     const comment = await ctx.db.get(args.commentId);
     if (!comment) throw new Error("Comment not found");
 
     // Check if user is comment author or track owner
     const track = await ctx.db.get(comment.trackId);
-    const isAuthor = comment.authorId === user._id;
-    const isTrackOwner = track?.creatorId === user._id;
+    const isAuthor = comment.authorId === userId;
+    const isTrackOwner = track?.creatorId === userId;
 
     if (!isAuthor && !isTrackOwner) {
       throw new Error("Not authorized");
@@ -162,21 +152,14 @@ export const updateComment = mutation({
     commentText: v.string(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token_identifier", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .first();
-
-    if (!user) throw new Error("User not found");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
 
     const comment = await ctx.db.get(args.commentId);
     if (!comment) throw new Error("Comment not found");
 
     // Only comment author can edit
-    if (comment.authorId !== user._id) {
+    if (comment.authorId !== userId) {
       throw new Error("Not authorized");
     }
 

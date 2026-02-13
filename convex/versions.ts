@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 /**
  * Create a new version for a track
@@ -16,20 +17,13 @@ export const create = mutation({
     duration: v.number(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token_identifier", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .first();
-
-    if (!user) throw new Error("User not found");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
 
     const track = await ctx.db.get(args.trackId);
     if (!track) throw new Error("Track not found");
 
-    if (track.creatorId !== user._id) {
+    if (track.creatorId !== userId) {
       throw new Error("Not authorized");
     }
 
@@ -43,7 +37,7 @@ export const create = mutation({
       fileSize: args.fileSize,
       fileFormat: args.fileFormat,
       duration: args.duration,
-      uploadedBy: user._id,
+      uploadedBy: userId,
     });
 
     // Update track's latest version
@@ -87,8 +81,8 @@ export const deleteVersion = mutation({
     versionId: v.id("versions"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
 
     const version = await ctx.db.get(args.versionId);
     if (!version) throw new Error("Version not found");
@@ -96,12 +90,7 @@ export const deleteVersion = mutation({
     const track = await ctx.db.get(version.trackId);
     if (!track) throw new Error("Track not found");
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token_identifier", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .first();
-
-    if (track.creatorId !== user?._id) {
+    if (track.creatorId !== userId) {
       throw new Error("Not authorized");
     }
 
