@@ -208,7 +208,7 @@ Current Version: "Final Mix" (uploaded 2 days ago)
   email: string,
   name: string,
   avatarUrl?: string,
-  clerkId?: string, // if using Convex Auth
+  tokenIdentifier: string, // Links to @convex-dev/auth identity
 }
 ```
 
@@ -274,13 +274,19 @@ Current Version: "Final Mix" (uploaded 2 days ago)
 ```
 
 ### Indexes
+- `users.by_email`: `email`
+- `users.by_token_identifier`: `tokenIdentifier`
 - `tracks.by_creator`: `creatorId`
 - `tracks.by_shareable_id`: `shareableId`
+- `tracks.by_public`: `isPublic`
 - `versions.by_track`: `trackId`
 - `comments.by_version`: `versionId`
 - `comments.by_track`: `trackId`
+- `comments.by_parent`: `parentCommentId`
+- `comments.by_timestamp`: `versionId`, `timestamp`
 - `trackAccess.by_track`: `trackId`
 - `trackAccess.by_user`: `userId`
+- `trackAccess.by_track_and_user`: `trackId`, `userId`
 
 ---
 
@@ -465,7 +471,8 @@ music-collab-platform/
 │   ├── versions.ts            # Version queries/mutations
 │   ├── comments.ts            # Comment queries/mutations
 │   ├── r2.ts                  # R2 actions (upload/download URLs)
-│   ├── auth.config.ts         # Convex Auth config
+│   ├── auth.ts                # Convex Auth config (Password provider)
+│   ├── http.ts                # HTTP routes for auth
 │   └── lib/
 │       └── r2Client.ts        # R2 SDK wrapper
 ├── frontend/
@@ -569,7 +576,8 @@ music-collab-platform/
 
 ### Convex Setup
 - Initialize with `npx convex init`
-- Configure auth provider in `convex/auth.config.ts`
+- Configure auth provider in `convex/auth.ts` (using `@convex-dev/auth` with Password provider)
+- Set up HTTP routes in `convex/http.ts` for auth endpoints
 - Deploy functions with `npx convex deploy`
 - **Environment Variables** (Convex dashboard):
   - Add R2 credentials as Convex environment variables

@@ -14,10 +14,18 @@ A web app for musicians to share demo tracks with collaborators. Think SoundClou
 ```
 ├── convex/          # Convex backend (schema, queries, mutations, R2 actions)
 ├── src/
-│   ├── components/  # React components
-│   ├── pages/       # Route pages
-│   ├── hooks/       # Custom React hooks
-│   └── lib/         # Utilities and Convex client setup
+│   ├── components/
+│   │   ├── audio/       # TrackPlayer, PlaybackControls
+│   │   ├── auth/        # LoginForm
+│   │   ├── comments/    # (placeholder - not implemented)
+│   │   ├── layout/      # Navbar
+│   │   ├── tracks/      # (placeholder - not implemented)
+│   │   ├── ui/          # Custom Button, Modal components
+│   │   └── upload/      # (placeholder - not implemented)
+│   ├── pages/       # Home, Login
+│   ├── hooks/       # useWaveform, usePresignedUrl, useFileUpload, useAudioDuration
+│   ├── lib/         # Convex client, utilities (cn, formatters, validators)
+│   └── types/       # TypeScript type definitions
 ```
 
 ## Key Concepts
@@ -45,6 +53,8 @@ A web app for musicians to share demo tracks with collaborators. Think SoundClou
 - Hooks/utils: camelCase (`useWaveform.ts`)
 - Use Convex hooks: `useQuery`, `useMutation`, `useAction`
 - Tailwind for styling, dark mode primary
+- Custom UI components (not shadcn/ui): `Button`, `Modal` in `src/components/ui/`
+- Convex Auth with Password provider (`@convex-dev/auth`)
 
 ## Environment Setup
 ```bash
@@ -56,10 +66,11 @@ R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME
 ```
 
 ## Important Details
-- **File formats:** MP3, WAV, FLAC, M4A (up to 200MB)
+- **File formats:** MP3, WAV, FLAC, M4A, AAC, OGG (up to 200MB)
 - **Comments:** Version-specific, can be timestamp or general
-- **Auth:** Optional - public tracks work without login
+- **Auth:** Convex Auth with Password provider - public tracks work without login
 - **Real-time:** Convex queries auto-update (reactive)
+- **Styling:** Custom Tailwind theme with Space Mono (display/mono) and Inter (body) fonts
 
 ## Common Patterns
 - Always destroy Wavesurfer instance in cleanup
@@ -69,13 +80,25 @@ R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME
 - Use Convex indexes for efficient queries
 
 ## Where to Find Details
-- Full feature spec and database schema: `PRD-Music-Collaboration-Platform.md`
+- Full feature spec and database schema: `PRD.md`
 - Convex schema: `convex/schema.ts`
 - R2 integration: `convex/r2.ts`
+- Auth configuration: `convex/auth.ts` (Password provider)
 
-## Development
-```bash
-npm run dev          # Start Vite dev server
-npx convex dev       # Run Convex in dev mode
-npx convex deploy    # Deploy Convex functions
-```
+## Quick Reference
+
+### Commands
+- `npm run dev` - Start Vite dev server (run `npx convex dev` separately for backend)
+- `npm run lint` - Run ESLint
+- `npm run lint -- --fix` - Fix auto-fixable lint issues  
+- `npm run typecheck` - Run TypeScript type checking
+- `npx convex dev` - Start Convex dev server (auto-generates types)
+
+**Do not run:** `npm run dev` (assume already running), `npm run build` (CI only)
+
+### Custom UI Components
+Custom components in `src/components/ui/`:
+- `Button` - Variants: primary, secondary, danger; Sizes: sm, md, lg
+- `Modal` - Basic modal wrapper
+- Uses Tailwind with custom studio theme (purple accent, dark mode)
+- Utility: `cn()` from `src/lib/utils.ts` for combining class names
