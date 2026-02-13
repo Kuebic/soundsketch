@@ -17,12 +17,12 @@ A web app for musicians to share demo tracks with collaborators. Think SoundClou
 │   ├── components/
 │   │   ├── audio/       # TrackPlayer, PlaybackControls
 │   │   ├── auth/        # LoginForm
-│   │   ├── comments/    # (placeholder - not implemented)
+│   │   ├── comments/    # CommentForm, CommentItem, CommentList, TimestampMarker
 │   │   ├── layout/      # Navbar
-│   │   ├── tracks/      # (placeholder - not implemented)
+│   │   ├── tracks/      # TrackCard, VersionSelector, ShareButton, TrackSettingsDropdown, AddVersionModal
 │   │   ├── ui/          # Custom Button, Modal components
-│   │   └── upload/      # (placeholder - not implemented)
-│   ├── pages/       # Home, Login
+│   │   └── upload/      # FileDropZone
+│   ├── pages/       # Home, Login, TrackPage, Upload, Profile
 │   ├── hooks/       # useWaveform, usePresignedUrl, useFileUpload, useAudioDuration
 │   ├── lib/         # Convex client, utilities (cn, formatters, validators)
 │   └── types/       # TypeScript type definitions
@@ -81,9 +81,14 @@ R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME
 
 ## Where to Find Details
 - Full feature spec and database schema: `PRD.md`
+- Implementation progress and phase coverage: `PROGRESS.md`
+- Git history (`git log --oneline`): Check for recent changes and context before starting work
 - Convex schema: `convex/schema.ts`
 - R2 integration: `convex/r2.ts`
 - Auth configuration: `convex/auth.ts` (Password provider)
+
+## After Making Changes
+- **Update `PROGRESS.md`** after adding, removing, or modifying features, components, pages, hooks, or backend functions. Keep the PRD phase coverage, file inventories, and "not yet implemented" sections accurate.
 
 ## Quick Reference
 
