@@ -11,10 +11,22 @@ export const viewer = query({
     if (!identity) {
       return null;
     }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token_identifier", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier)
+      )
+      .first();
+
+    if (!user) {
+      return null;
+    }
+
     return {
-      id: identity.subject,
-      name: identity.name,
-      email: identity.email,
+      _id: user._id,
+      name: user.name,
+      email: user.email,
     };
   },
 });

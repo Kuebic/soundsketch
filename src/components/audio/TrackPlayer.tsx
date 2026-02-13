@@ -1,15 +1,32 @@
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { useWaveform } from '@/hooks/useWaveform';
 import { usePresignedUrl } from '@/hooks/usePresignedUrl';
 import { PlaybackControls } from './PlaybackControls';
+import { TimestampMarker } from '@/components/comments/TimestampMarker';
 import { Loader2 } from 'lucide-react';
+
+interface TimestampComment {
+  id: string;
+  timestamp: number;
+  authorName: string;
+  commentPreview: string;
+}
 
 interface TrackPlayerProps {
   r2Key: string;
   onTimestampClick?: (timestamp: number) => void;
+  timestampComments?: TimestampComment[];
+  seekToTime?: number | null;
+  onSeekComplete?: () => void;
 }
 
-export function TrackPlayer({ r2Key, onTimestampClick }: TrackPlayerProps) {
+export function TrackPlayer({
+  r2Key,
+  onTimestampClick,
+  timestampComments,
+  seekToTime,
+  onSeekComplete,
+}: TrackPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { url, loading: urlLoading } = usePresignedUrl(r2Key);
 
@@ -25,10 +42,17 @@ export function TrackPlayer({ r2Key, onTimestampClick }: TrackPlayerProps) {
     audioUrl: url || '',
     containerRef,
     onReady: () => console.log('Waveform ready'),
-    onTimeUpdate: (time) => {
-      // Could trigger timestamp comment highlighting here
-    },
+    onTimeUpdate: () => {},
   });
+
+  // Handle external seek requests
+  useEffect(() => {
+    if (seekToTime != null && duration > 0) {
+      seekTo(seekToTime / duration);
+      if (!isPlaying) playPause();
+      onSeekComplete?.();
+    }
+  }, [seekToTime]);
 
   if (urlLoading) {
     return (
@@ -51,19 +75,40 @@ export function TrackPlayer({ r2Key, onTimestampClick }: TrackPlayerProps) {
 
   return (
     <div className="card space-y-6">
-      {/* Waveform */}
-      <div
-        ref={containerRef}
-        className="waveform-container w-full cursor-pointer"
-        onClick={(e) => {
-          // Calculate timestamp from click position for future timestamp comments
-          const rect = e.currentTarget.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const progress = x / rect.width;
-          const timestamp = progress * duration;
-          onTimestampClick?.(timestamp);
-        }}
-      />
+      {/* Waveform with timestamp markers */}
+      <div className="relative">
+        <div
+          ref={containerRef}
+          className="waveform-container w-full cursor-pointer"
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const progress = x / rect.width;
+            const timestamp = progress * duration;
+            onTimestampClick?.(timestamp);
+          }}
+        />
+
+        {/* Timestamp comment markers overlay */}
+        {timestampComments && duration > 0 && (
+          <div className="absolute inset-0 pointer-events-none">
+            {timestampComments.map((tc) => (
+              <div key={tc.id} className="pointer-events-auto">
+                <TimestampMarker
+                  timestamp={tc.timestamp}
+                  duration={duration}
+                  authorName={tc.authorName}
+                  commentPreview={tc.commentPreview}
+                  onClick={() => {
+                    seekTo(tc.timestamp / duration);
+                    if (!isPlaying) playPause();
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Playback Controls */}
       <PlaybackControls

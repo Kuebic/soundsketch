@@ -15,7 +15,7 @@ export const getTrackUploadUrl = action({
     trackId: v.optional(v.id("tracks")),
     versionName: v.string(),
   },
-  handler: async (ctx, args): Promise<{ uploadUrl: string; r2Key: string }> => {
+  handler: async (_ctx, args): Promise<{ uploadUrl: string; r2Key: string }> => {
     // Generate unique R2 key to prevent collisions
     const uniqueId = nanoid();
     const extension = args.fileName.split('.').pop();
@@ -34,7 +34,7 @@ export const getTrackDownloadUrl = action({
   args: {
     r2Key: v.string(),
   },
-  handler: async (ctx, args): Promise<{ downloadUrl: string }> => {
+  handler: async (_ctx, args): Promise<{ downloadUrl: string }> => {
     const downloadUrl = await generateDownloadUrl(args.r2Key, BUCKET_NAME);
     return { downloadUrl };
   },
@@ -49,7 +49,7 @@ export const getAttachmentUploadUrl = action({
     fileType: v.string(),
     commentId: v.string(), // will become ID after comment creation
   },
-  handler: async (ctx, args): Promise<{ uploadUrl: string; r2Key: string }> => {
+  handler: async (_ctx, args): Promise<{ uploadUrl: string; r2Key: string }> => {
     const uniqueId = nanoid();
     const extension = args.fileName.split('.').pop();
     const r2Key = `attachments/${args.commentId}/${uniqueId}.${extension}`;

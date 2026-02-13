@@ -39,7 +39,6 @@ export function useWaveform({
       cursorWidth: 2,
       height: 128,
       barGap: 1,
-      responsive: true,
       normalize: true,
     });
 
