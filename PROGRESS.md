@@ -41,7 +41,7 @@
 | Timestamp markers on waveform | Done | `TimestampMarker` overlay, click-to-seek |
 | Edit/delete comments | Done | Author + track-owner moderation in `CommentItem` |
 
-### Phase 3: Enhanced Features — Mostly Complete
+### Phase 3: Enhanced Features — Complete
 
 | Requirement | Status | Implementation |
 |-------------|--------|----------------|
@@ -50,19 +50,21 @@
 | Private tracks + access control | Done | `trackAccess` table, `getByShareableId` access checks |
 | Privacy toggle | Done | `TrackSettingsDropdown`, `updatePrivacy` mutation |
 | Track deletion | Done | `deleteTrack` mutation with confirmation modal |
-| Comment attachments UI | Not started | Backend supports `attachmentR2Key`; frontend forms don't expose it |
+| Comment attachments | Done | `useAttachmentUpload` hook, `CommentForm` file picker, `CommentItem` download |
+| Show comments across versions | Done | `includeAllVersions` param in queries, toggle in `TrackPage` |
 | Responsive design | Done | Tailwind responsive classes throughout |
 | Loading states + error handling | Done | Conditional rendering across pages |
 | Dark mode theming | Done | `studio.*` color palette, Space Mono + Inter fonts |
 
-### Phase 4: Collaboration Features — Not Started
+### Phase 4: Collaboration Features — Partially Complete
 
 | Requirement | Status | Notes |
 |-------------|--------|-------|
-| Email notifications | Not started | PRD future phase |
-| @mentions in comments | Not started | PRD future phase |
+| @mentions in comments | Done | `MentionInput` component, `getTrackParticipants` query, highlight rendering |
+| Collaborator invites | Done | `ManageCollaboratorsModal`, `grantAccess`/`revokeAccess` mutations, `searchByEmail` |
+| Shared with Me (Profile) | Done | `getSharedWithMe` query, section in Profile page |
+| Email notifications | Not started | Requires external email service (e.g., Resend) |
 | Collaborator roles (viewer/commenter/editor) | Not started | PRD future phase |
-| Invite-only private tracks | Not started | `trackAccess` table exists but no invite UI |
 
 ---
 
@@ -80,11 +82,11 @@
 
 | File | Functions | Status |
 |------|-----------|--------|
-| `convex/tracks.ts` | create, getPublicTracks, getByShareableId (w/ access control), getMyTracks, updatePrivacy, deleteTrack | Done |
+| `convex/tracks.ts` | create, getPublicTracks, getByShareableId (w/ access control), getMyTracks, updatePrivacy, deleteTrack, grantAccess, revokeAccess, getCollaborators, getSharedWithMe | Done |
 | `convex/versions.ts` | create, getByTrack, getById, deleteVersion (w/ fallback) | Done |
-| `convex/comments.ts` | create (guest-friendly), getByVersion, getTimestampComments, getGeneralComments, getReplies, deleteComment, updateComment | Done |
-| `convex/r2.ts` | getTrackUploadUrl, getTrackDownloadUrl, getAttachmentUploadUrl | Done |
-| `convex/users.ts` | viewer (returns `_id` from users table) | Done |
+| `convex/comments.ts` | create (guest-friendly), getByVersion, getTimestampComments (w/ includeAllVersions), getGeneralComments (w/ includeAllVersions), getReplies, deleteComment, updateComment | Done |
+| `convex/r2.ts` | getTrackUploadUrl, getTrackDownloadUrl, getAttachmentDownloadUrl, getAttachmentUploadUrl | Done |
+| `convex/users.ts` | viewer (returns `_id` from users table), searchByEmail, getTrackParticipants | Done |
 | `convex/auth.ts` | Convex Auth with Password provider | Done |
 | `convex/http.ts` | Auth HTTP routes | Done |
 | `convex/lib/r2Client.ts` | S3-compatible R2 client, generateUploadUrl, generateDownloadUrl | Done |
@@ -101,7 +103,7 @@
 | Tailwind CSS with custom theme | `tailwind.config.js`, `src/styles/globals.css` | `studio.*` color palette, Space Mono + Inter fonts |
 | Convex client setup | `src/lib/convex.ts` | ConvexReactClient singleton |
 | ConvexAuthProvider | `src/main.tsx` | Wraps entire app |
-| Utility functions | `src/lib/utils.ts` | cn, formatDuration, formatFileSize, validateAudioFile, generateShareableLink, formatRelativeTime |
+| Utility functions | `src/lib/utils.ts` | cn, formatDuration, formatFileSize, validateAudioFile, validateAttachmentFile, getAttachmentType, generateShareableLink, formatRelativeTime |
 | Type definitions | `src/types/index.ts` | Track, Version, Comment, User type exports |
 
 ### Hooks
@@ -112,6 +114,7 @@
 | `usePresignedUrl` | `src/hooks/usePresignedUrl.ts` | Fetches + caches R2 download URLs (55-min cache) |
 | `useFileUpload` | `src/hooks/useFileUpload.ts` | Full upload pipeline: validate → presigned URL → XHR to R2 → save metadata |
 | `useAudioDuration` | `src/hooks/useAudioDuration.ts` | Extract duration from audio File via HTML5 Audio API |
+| `useAttachmentUpload` | `src/hooks/useAttachmentUpload.ts` | Attachment upload: validate → presigned URL → XHR to R2 with progress |
 
 ### Pages
 
@@ -119,11 +122,11 @@
 |------|-------|--------|
 | Home | `/` | Done — hero section + public tracks grid (uses TrackCard) |
 | Login | `/login` | Done — email/password, sign in/sign up toggle |
-| Track Detail | `/track/:shareableId` | Done — player, versions, comments, settings |
+| Track Detail | `/track/:shareableId` | Done — player, versions, comments (w/ cross-version toggle), settings |
 | Upload | `/upload` | Done — file drop, form, progress bar, redirect |
-| Profile | `/profile` | Done — user info, track grid with privacy badges |
+| Profile | `/profile` | Done — user info, track grid with privacy badges, shared tracks section |
 
-### Components (16 total)
+### Components (19 total)
 
 | Component | Location | Status |
 |-----------|----------|--------|
@@ -136,12 +139,14 @@
 | TrackCard | `src/components/tracks/TrackCard.tsx` | Done — reusable card for Home + Profile |
 | VersionSelector | `src/components/tracks/VersionSelector.tsx` | Done — dropdown with version names + dates |
 | ShareButton | `src/components/tracks/ShareButton.tsx` | Done — copies link to clipboard |
-| TrackSettingsDropdown | `src/components/tracks/TrackSettingsDropdown.tsx` | Done — privacy toggle, delete with confirmation |
+| TrackSettingsDropdown | `src/components/tracks/TrackSettingsDropdown.tsx` | Done — privacy toggle, delete, manage collaborators |
 | AddVersionModal | `src/components/tracks/AddVersionModal.tsx` | Done — file upload + version metadata |
-| CommentForm | `src/components/comments/CommentForm.tsx` | Done — text input with optional timestamp |
-| CommentItem | `src/components/comments/CommentItem.tsx` | Done — display, edit, delete, reply, timestamp click |
+| ManageCollaboratorsModal | `src/components/tracks/ManageCollaboratorsModal.tsx` | Done — invite by email, list/remove collaborators |
+| CommentForm | `src/components/comments/CommentForm.tsx` | Done — text input, optional timestamp, file attachment, @mention support |
+| CommentItem | `src/components/comments/CommentItem.tsx` | Done — display, edit, delete, reply, timestamp click, attachment download, mention highlighting |
 | CommentList | `src/components/comments/CommentList.tsx` | Done — renders top-level comments |
 | TimestampMarker | `src/components/comments/TimestampMarker.tsx` | Done — waveform overlay markers |
+| MentionInput | `src/components/comments/MentionInput.tsx` | Done — textarea with @mention autocomplete dropdown |
 | FileDropZone | `src/components/upload/FileDropZone.tsx` | Done — drag-drop + validation |
 
 ### Routing (`src/App.tsx`)
@@ -159,6 +164,7 @@ All routes wired: `/`, `/login`, `/track/:shareableId`, `/upload`, `/profile`, `
 - **Ownership check**: Compare `viewer._id` with `track.creatorId` (both are `Id<"users">`)
 - **R2 upload flow**: Get presigned PUT URL → XHR upload → save metadata via mutation
 - **R2 playback flow**: Get presigned GET URL (1hr cache) → pass to WaveSurfer
+- **Attachment flow**: Select file → validate → upload to R2 → store r2Key in comment
 - **WaveSurfer**: Initialize in useEffect, destroy in cleanup. Never leak instances.
 - **Styling**: Tailwind with `studio.*` custom colors, `.card`/`.input` base classes, dark mode default
 
@@ -167,11 +173,8 @@ All routes wired: `/`, `/login`, `/track/:shareableId`, `/upload`, `/profile`, `
 ## What's Not Yet Implemented
 
 **From PRD — future phases:**
-- Comment attachments UI (backend schema supports it; frontend forms don't expose file attachment)
-- @mentions in comments
-- Email notifications
-- Collaborator roles / invite-only tracks (trackAccess table exists but no UI)
-- "Show all comments across versions" toggle
+- Email notifications (requires external email service like Resend)
+- Collaborator roles (viewer/commenter/editor — only basic access grant/revoke exists)
 
 **Tooling:**
 - ESLint configuration (no `.eslintrc` at project root; `npm run lint` fails)

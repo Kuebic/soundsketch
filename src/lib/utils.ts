@@ -55,6 +55,48 @@ export function validateAudioFile(file: File): { valid: boolean; error?: string 
 }
 
 /**
+ * Validate attachment file format and size
+ */
+export function validateAttachmentFile(file: File): { valid: boolean; error?: string } {
+  const maxSize = 50 * 1024 * 1024; // 50MB
+  const allowedFormats = [
+    'mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg',
+    'png', 'jpg', 'jpeg', 'gif', 'webp',
+    'pdf', 'txt',
+  ];
+
+  if (file.size > maxSize) {
+    return {
+      valid: false,
+      error: `Attachment exceeds 50MB limit (${formatFileSize(file.size)})`,
+    };
+  }
+
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  if (!extension || !allowedFormats.includes(extension)) {
+    return {
+      valid: false,
+      error: 'Unsupported format. Allowed: audio, images (PNG, JPG), PDF, text files',
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Get the display category of an attachment file
+ */
+export function getAttachmentType(fileName: string): 'audio' | 'image' | 'pdf' | 'text' | 'unknown' {
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  if (!ext) return 'unknown';
+  if (['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg'].includes(ext)) return 'audio';
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) return 'image';
+  if (ext === 'pdf') return 'pdf';
+  if (ext === 'txt') return 'text';
+  return 'unknown';
+}
+
+/**
  * Generate shareable link URL
  */
 export function generateShareableLink(shareableId: string): string {

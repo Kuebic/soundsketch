@@ -3,11 +3,12 @@ import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../../convex/_generated/api';
 import { Navbar } from '@/components/layout/Navbar';
 import { TrackCard } from '@/components/tracks/TrackCard';
-import { Loader2, Music, Upload } from 'lucide-react';
+import { Loader2, Music, Upload, Share2 } from 'lucide-react';
 
 export function Profile() {
   const viewer = useQuery(api.users.viewer);
   const myTracks = useQuery(api.tracks.getMyTracks);
+  const sharedTracks = useQuery(api.tracks.getSharedWithMe);
   const navigate = useNavigate();
 
   // Auth guard
@@ -79,6 +80,35 @@ export function Profile() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {myTracks.map((track) => (
                 <TrackCard key={track._id} track={track} showPrivacyBadge />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Shared with Me */}
+        <section className="mt-12">
+          <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2">
+            <Share2 className="w-6 h-6" />
+            Shared with Me
+            {sharedTracks && (
+              <span className="text-studio-text-secondary text-base ml-2">({sharedTracks.length})</span>
+            )}
+          </h2>
+
+          {sharedTracks === undefined ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-studio-text-secondary" />
+            </div>
+          ) : sharedTracks.length === 0 ? (
+            <div className="card text-center py-12">
+              <p className="text-studio-text-secondary">
+                No tracks have been shared with you yet.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {sharedTracks.map((track) => (
+                <TrackCard key={track._id} track={track} />
               ))}
             </div>
           )}

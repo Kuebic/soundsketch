@@ -77,12 +77,25 @@ export const getByVersion = query({
  * Get timestamp comments for a version (sorted by timestamp)
  */
 export const getTimestampComments = query({
-  args: { versionId: v.id("versions") },
+  args: {
+    versionId: v.id("versions"),
+    includeAllVersions: v.optional(v.boolean()),
+  },
   handler: async (ctx, args) => {
-    const comments = await ctx.db
-      .query("comments")
-      .withIndex("by_version", (q) => q.eq("versionId", args.versionId))
-      .collect();
+    let comments;
+    if (args.includeAllVersions) {
+      const version = await ctx.db.get(args.versionId);
+      if (!version) return [];
+      comments = await ctx.db
+        .query("comments")
+        .withIndex("by_track", (q) => q.eq("trackId", version.trackId))
+        .collect();
+    } else {
+      comments = await ctx.db
+        .query("comments")
+        .withIndex("by_version", (q) => q.eq("versionId", args.versionId))
+        .collect();
+    }
 
     return comments
       .filter((c) => c.timestamp !== undefined)
@@ -94,12 +107,25 @@ export const getTimestampComments = query({
  * Get general comments for a version (no timestamp)
  */
 export const getGeneralComments = query({
-  args: { versionId: v.id("versions") },
+  args: {
+    versionId: v.id("versions"),
+    includeAllVersions: v.optional(v.boolean()),
+  },
   handler: async (ctx, args) => {
-    const comments = await ctx.db
-      .query("comments")
-      .withIndex("by_version", (q) => q.eq("versionId", args.versionId))
-      .collect();
+    let comments;
+    if (args.includeAllVersions) {
+      const version = await ctx.db.get(args.versionId);
+      if (!version) return [];
+      comments = await ctx.db
+        .query("comments")
+        .withIndex("by_track", (q) => q.eq("trackId", version.trackId))
+        .collect();
+    } else {
+      comments = await ctx.db
+        .query("comments")
+        .withIndex("by_version", (q) => q.eq("versionId", args.versionId))
+        .collect();
+    }
 
     return comments.filter((c) => c.timestamp === undefined);
   },

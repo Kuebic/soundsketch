@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { Button } from '@/components/ui/Button';
 import { CommentForm } from './CommentForm';
-import { formatDuration, formatRelativeTime } from '@/lib/utils';
-import { Clock, Reply, Trash2, Pencil, ChevronDown, ChevronRight } from 'lucide-react';
+import { formatDuration, formatRelativeTime, getAttachmentType } from '@/lib/utils';
+import { Clock, Reply, Trash2, Pencil, ChevronDown, ChevronRight, Download, FileAudio, Image, FileText, File, Loader2 } from 'lucide-react';
 import type { Comment, TrackId, VersionId, UserId } from '@/types';
 
 interface CommentItemProps {
@@ -15,6 +15,14 @@ interface CommentItemProps {
   versionId: VersionId;
   trackId: TrackId;
 }
+
+const attachmentTypeIcons = {
+  audio: FileAudio,
+  image: Image,
+  pdf: FileText,
+  text: FileText,
+  unknown: File,
+};
 
 export function CommentItem({
   comment,
@@ -29,6 +37,7 @@ export function CommentItem({
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(comment.commentText);
   const [deleting, setDeleting] = useState(false);
+  const [loadingAttachment, setLoadingAttachment] = useState(false);
 
   const replies = useQuery(
     api.comments.getReplies,
@@ -36,9 +45,15 @@ export function CommentItem({
   );
   const deleteComment = useMutation(api.comments.deleteComment);
   const updateComment = useMutation(api.comments.updateComment);
+  const getAttachmentDownloadUrl = useAction(api.r2.getAttachmentDownloadUrl);
 
   const canModify = currentUserId === comment.authorId;
   const canDelete = canModify || isTrackOwner;
+
+  const hasAttachment = comment.attachmentR2Key && comment.attachmentFileName;
+  const AttachmentIcon = hasAttachment
+    ? attachmentTypeIcons[getAttachmentType(comment.attachmentFileName!)]
+    : File;
 
   const handleDelete = async () => {
     try {
@@ -56,6 +71,34 @@ export function CommentItem({
       setEditing(false);
     } catch {
       // keep editing mode on failure
+    }
+  };
+
+  const renderCommentText = (text: string) => {
+    // Split on @mentions — match @Word or @Multi Word (up to next @ or end)
+    const parts = text.split(/(@\S+(?:\s\S+)?)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('@')) {
+        return (
+          <span key={i} className="text-studio-accent font-medium">
+            {part}
+          </span>
+        );
+      }
+      return part;
+    });
+  };
+
+  const handleDownloadAttachment = async () => {
+    if (!comment.attachmentR2Key) return;
+    try {
+      setLoadingAttachment(true);
+      const { downloadUrl } = await getAttachmentDownloadUrl({ r2Key: comment.attachmentR2Key });
+      window.open(downloadUrl, '_blank');
+    } catch {
+      // silently fail
+    } finally {
+      setLoadingAttachment(false);
     }
   };
 
@@ -98,8 +141,28 @@ export function CommentItem({
         </div>
       ) : (
         <p className="text-sm text-studio-text-secondary mb-2 whitespace-pre-wrap">
-          {comment.commentText}
+          {renderCommentText(comment.commentText)}
         </p>
+      )}
+
+      {/* Attachment */}
+      {hasAttachment && (
+        <div className="flex items-center gap-2 bg-studio-dark border border-studio-gray rounded-lg px-3 py-2 text-sm mb-2 max-w-sm">
+          <AttachmentIcon className="w-4 h-4 text-studio-accent-cyan flex-shrink-0" />
+          <span className="truncate flex-1">{comment.attachmentFileName}</span>
+          <button
+            onClick={handleDownloadAttachment}
+            disabled={loadingAttachment}
+            className="text-studio-text-secondary hover:text-studio-accent flex-shrink-0"
+            title="Download attachment"
+          >
+            {loadingAttachment ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+          </button>
+        </div>
       )}
 
       {/* Actions */}

@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../../../convex/_generated/api';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { Settings, Globe, Lock, Trash2 } from 'lucide-react';
+import { ManageCollaboratorsModal } from './ManageCollaboratorsModal';
+import { Settings, Globe, Lock, Trash2, Users } from 'lucide-react';
 import type { Track } from '@/types';
 
 interface TrackSettingsDropdownProps {
@@ -14,6 +15,7 @@ interface TrackSettingsDropdownProps {
 export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
   const [open, setOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showCollaborators, setShowCollaborators] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const navigate = useNavigate();
@@ -68,6 +70,13 @@ export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
               )}
             </button>
             <button
+              onClick={() => { setOpen(false); setShowCollaborators(true); }}
+              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-studio-dark text-left"
+            >
+              <Users className="w-4 h-4" />
+              Manage Collaborators
+            </button>
+            <button
               onClick={() => { setOpen(false); setShowDeleteConfirm(true); }}
               className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-studio-dark text-red-400 text-left"
             >
@@ -77,6 +86,13 @@ export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
           </div>
         </>
       )}
+
+      {/* Manage Collaborators */}
+      <ManageCollaboratorsModal
+        isOpen={showCollaborators}
+        onClose={() => setShowCollaborators(false)}
+        trackId={track._id}
+      />
 
       {/* Delete confirmation */}
       <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Delete Track" size="sm">

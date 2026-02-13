@@ -12,7 +12,7 @@ import { CommentForm } from '@/components/comments/CommentForm';
 import { CommentList } from '@/components/comments/CommentList';
 import { Button } from '@/components/ui/Button';
 import { formatDuration } from '@/lib/utils';
-import { Loader2, Globe, Lock, Plus, X, Clock, MessageCircle } from 'lucide-react';
+import { Loader2, Globe, Lock, Plus, X, Clock, MessageCircle, Layers } from 'lucide-react';
 import type { VersionId } from '@/types';
 
 export function TrackPage() {
@@ -21,6 +21,7 @@ export function TrackPage() {
   const [timestampForComment, setTimestampForComment] = useState<number | null>(null);
   const [seekToTime, setSeekToTime] = useState<number | null>(null);
   const [showAddVersion, setShowAddVersion] = useState(false);
+  const [showAllVersions, setShowAllVersions] = useState(false);
 
   // Data fetching
   const track = useQuery(api.tracks.getByShareableId, shareableId ? { shareableId } : 'skip');
@@ -31,11 +32,11 @@ export function TrackPage() {
   );
   const timestampComments = useQuery(
     api.comments.getTimestampComments,
-    selectedVersionId ? { versionId: selectedVersionId } : 'skip'
+    selectedVersionId ? { versionId: selectedVersionId, includeAllVersions: showAllVersions } : 'skip'
   );
   const generalComments = useQuery(
     api.comments.getGeneralComments,
-    selectedVersionId ? { versionId: selectedVersionId } : 'skip'
+    selectedVersionId ? { versionId: selectedVersionId, includeAllVersions: showAllVersions } : 'skip'
   );
 
   // Set initial selected version when versions load
@@ -119,17 +120,31 @@ export function TrackPage() {
 
         {/* Version Selector */}
         {versions && versions.length > 0 && selectedVersionId && (
-          <div className="mb-4 flex items-center justify-between">
-            <VersionSelector
-              versions={versions}
-              currentVersionId={selectedVersionId}
-              onVersionChange={setSelectedVersionId}
-            />
-            {isOwner && (
-              <Button variant="secondary" size="sm" onClick={() => setShowAddVersion(true)}>
-                <Plus className="w-4 h-4 mr-1" />
-                New Version
-              </Button>
+          <div className="mb-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <VersionSelector
+                versions={versions}
+                currentVersionId={selectedVersionId}
+                onVersionChange={setSelectedVersionId}
+              />
+              {isOwner && (
+                <Button variant="secondary" size="sm" onClick={() => setShowAddVersion(true)}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  New Version
+                </Button>
+              )}
+            </div>
+            {versions.length > 1 && (
+              <label className="flex items-center gap-2 text-sm text-studio-text-secondary cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showAllVersions}
+                  onChange={(e) => setShowAllVersions(e.target.checked)}
+                  className="accent-studio-accent"
+                />
+                <Layers className="w-4 h-4" />
+                Show comments from all versions
+              </label>
             )}
           </div>
         )}

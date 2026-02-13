@@ -41,6 +41,19 @@ export const getTrackDownloadUrl = action({
 });
 
 /**
+ * Generate presigned URL for downloading a comment attachment from R2
+ */
+export const getAttachmentDownloadUrl = action({
+  args: {
+    r2Key: v.string(),
+  },
+  handler: async (_ctx, args): Promise<{ downloadUrl: string }> => {
+    const downloadUrl = await generateDownloadUrl(args.r2Key, BUCKET_NAME);
+    return { downloadUrl };
+  },
+});
+
+/**
  * Generate presigned URL for uploading a comment attachment to R2
  */
 export const getAttachmentUploadUrl = action({
