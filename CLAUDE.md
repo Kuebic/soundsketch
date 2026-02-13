@@ -88,6 +88,8 @@ R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME
 - Auth configuration: `convex/auth.ts` (Password provider)
 
 ## After Making Changes
+- **Run `npm run typecheck`** to check for TypeScript errors.
+- **Run `npm run lint`** to check for ESLint issues. Use `npm run lint -- --fix` to auto-fix.
 - **Update `PROGRESS.md`** after adding, removing, or modifying features, components, pages, hooks, or backend functions. Keep the PRD phase coverage, file inventories, and "not yet implemented" sections accurate.
 
 ## Quick Reference
