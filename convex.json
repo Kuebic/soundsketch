@@ -2,11 +2,5 @@
   "functions": "convex/",
   "node": {
     "externalPackages": ["@aws-sdk/client-s3", "@aws-sdk/s3-request-presigner"]
-  },
-  "authInfo": [
-    {
-      "applicationID": "convex",
-      "domain": "https://your-deployment.convex.cloud"
-    }
-  ]
+  }
 }
