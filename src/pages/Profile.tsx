@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, useAction } from 'convex/react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuthActions } from '@convex-dev/auth/react';
@@ -16,6 +16,7 @@ export function Profile() {
   const updateName = useMutation(api.users.updateName);
   const updateEmail = useMutation(api.users.updateEmail);
   const deleteAccount = useMutation(api.users.deleteAccount);
+  const changePassword = useAction(api.users.changePassword);
   const myTracks = useQuery(api.tracks.getMyTracks);
   const sharedTracks = useQuery(api.tracks.getSharedWithMe);
   const navigate = useNavigate();
@@ -37,6 +38,13 @@ export function Profile() {
   const [deletionMode, setDeletionMode] = useState<'keep_comments' | 'delete_everything'>('keep_comments');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleting, setDeleting] = useState(false);
+
+  // Password change state
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
 
   const [myTracksFilter, setMyTracksFilter] = useState('');
   const [sharedFilter, setSharedFilter] = useState('');
@@ -129,6 +137,48 @@ export function Profile() {
       toast.error(err instanceof Error ? err.message : 'Failed to delete account');
       setDeleting(false);
     }
+  };
+
+  // Password change handlers
+  const handleChangePassword = async () => {
+    if (!currentPassword) {
+      toast.error('Please enter your current password');
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast.error('New password must be at least 8 characters');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
+    if (currentPassword === newPassword) {
+      toast.error('New password must be different from current password');
+      return;
+    }
+
+    try {
+      setSavingPassword(true);
+      await changePassword({ currentPassword, newPassword });
+      toast.success('Password changed successfully');
+      setChangingPassword(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to change password';
+      toast.error(message);
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
+  const handleCancelPasswordChange = () => {
+    setChangingPassword(false);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmNewPassword('');
   };
 
   // Auth guard
@@ -356,20 +406,98 @@ export function Profile() {
           </button>
 
           {settingsExpanded && (
-            <div className="mt-4 card border-red-500/30 max-w-md">
-              <div className="flex items-center gap-2 text-red-400 mb-3">
-                <AlertTriangle className="w-5 h-5" />
-                <h3 className="font-semibold">Danger Zone</h3>
+            <div className="mt-4 space-y-4 max-w-md">
+              {/* Change Password */}
+              <div className="card">
+                <h3 className="font-semibold mb-3">Change Password</h3>
+                {changingPassword ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Current Password</label>
+                      <input
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        className="input"
+                        placeholder="Enter current password"
+                        disabled={savingPassword}
+                        autoFocus
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">New Password</label>
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="input"
+                        placeholder="Enter new password"
+                        disabled={savingPassword}
+                      />
+                      <p className="text-xs text-studio-text-secondary mt-1">
+                        Must be at least 8 characters
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Confirm New Password</label>
+                      <input
+                        type="password"
+                        value={confirmNewPassword}
+                        onChange={(e) => setConfirmNewPassword(e.target.value)}
+                        className="input"
+                        placeholder="Confirm new password"
+                        disabled={savingPassword}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') void handleChangePassword();
+                          if (e.key === 'Escape') handleCancelPasswordChange();
+                        }}
+                      />
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        size="sm"
+                        onClick={() => void handleChangePassword()}
+                        disabled={savingPassword || !currentPassword || !newPassword || !confirmNewPassword}
+                      >
+                        {savingPassword ? 'Saving...' : 'Change Password'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={handleCancelPasswordChange}
+                        disabled={savingPassword}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setChangingPassword(true)}
+                  >
+                    Change Password
+                  </Button>
+                )}
               </div>
-              <p className="text-sm text-studio-text-secondary mb-4">
-                Once you delete your account, there is no going back. Please be certain.
-              </p>
-              <Button
-                variant="danger"
-                onClick={() => setDeleteModalOpen(true)}
-              >
-                Delete Account
-              </Button>
+
+              {/* Danger Zone */}
+              <div className="card border-red-500/30">
+                <div className="flex items-center gap-2 text-red-400 mb-3">
+                  <AlertTriangle className="w-5 h-5" />
+                  <h3 className="font-semibold">Danger Zone</h3>
+                </div>
+                <p className="text-sm text-studio-text-secondary mb-4">
+                  Once you delete your account, there is no going back. Please be certain.
+                </p>
+                <Button
+                  variant="danger"
+                  onClick={() => setDeleteModalOpen(true)}
+                >
+                  Delete Account
+                </Button>
+              </div>
             </div>
           )}
         </section>

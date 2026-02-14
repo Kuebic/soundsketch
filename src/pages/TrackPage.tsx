@@ -136,7 +136,7 @@ export function TrackPage() {
                 onVersionChange={setSelectedVersionId}
               />
               {isOwner && (
-                <Button variant="secondary" size="sm" onClick={() => setShowAddVersion(true)}>
+                <Button variant="secondary" size="sm" className="self-start" onClick={() => setShowAddVersion(true)}>
                   <Plus className="w-4 h-4 mr-1" />
                   New Version
                 </Button>

@@ -1,6 +1,12 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, action } from "./_generated/server";
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import {
+  getAuthUserId,
+  retrieveAccount,
+  modifyAccountCredentials,
+  invalidateSessions,
+  getAuthSessionId,
+} from "@convex-dev/auth/server";
 import { api } from "./_generated/api";
 
 /**
@@ -303,5 +309,63 @@ export const deleteAccount = mutation({
     }
 
     return { deleted: true };
+  },
+});
+
+/**
+ * Change the current user's password.
+ * Requires verification of the current password before updating.
+ */
+export const changePassword = action({
+  args: {
+    currentPassword: v.string(),
+    newPassword: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // 1. Verify user is authenticated
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    // 2. Get user's email from database
+    const user = await ctx.runQuery(api.users.viewer);
+    if (!user?.email) throw new Error("No email associated with account");
+
+    // 3. Validate new password length
+    if (args.newPassword.length < 8) {
+      throw new Error("New password must be at least 8 characters");
+    }
+
+    // 4. Verify current password using retrieveAccount
+    try {
+      await retrieveAccount(ctx, {
+        provider: "password",
+        account: {
+          id: user.email,
+          secret: args.currentPassword,
+        },
+      });
+    } catch {
+      throw new Error("Current password is incorrect");
+    }
+
+    // 5. Update to new password
+    await modifyAccountCredentials(ctx, {
+      provider: "password",
+      account: {
+        id: user.email,
+        secret: args.newPassword,
+      },
+    });
+
+    // 6. Invalidate other sessions for security (keep current session)
+    const sessionId = await getAuthSessionId(ctx);
+    if (sessionId) {
+      await invalidateSessions(ctx, {
+        userId,
+        except: [sessionId],
+      });
+    }
+
+    return { success: true };
   },
 });
