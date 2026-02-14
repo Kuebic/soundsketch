@@ -111,7 +111,7 @@ export function MentionInput({
   };
 
   return (
-    <div className="relative">
+    <div className="relative flex-1">
       <textarea
         ref={textareaRef}
         value={value}
@@ -120,7 +120,7 @@ export function MentionInput({
         placeholder={placeholder}
         rows={rows}
         disabled={disabled}
-        className={className}
+        className={`${className} w-full`}
       />
 
       {showDropdown && filteredParticipants.length > 0 && (

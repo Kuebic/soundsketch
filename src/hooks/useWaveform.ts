@@ -40,7 +40,7 @@ export function useWaveform({
       barWidth: 2,
       barRadius: 3,
       cursorWidth: 2,
-      height: 128,
+      height: 80,
       barGap: 1,
       normalize: true,
     });

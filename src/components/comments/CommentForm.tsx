@@ -139,16 +139,16 @@ export function CommentForm({
             onChange={setText}
             participants={participants}
             placeholder={placeholder}
-            rows={2}
+            rows={3}
             disabled={submitting || uploading}
-            className="input flex-1 resize-none text-sm"
+            className="input resize-none text-sm"
           />
         ) : (
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={placeholder}
-            rows={2}
+            rows={3}
             className="input flex-1 resize-none text-sm"
             disabled={submitting || uploading}
           />
