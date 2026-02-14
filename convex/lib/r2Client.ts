@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 /**
@@ -61,4 +61,43 @@ export async function generateDownloadUrl(
     Key: key,
   });
   return getSignedUrl(client, command, { expiresIn });
+}
+
+/**
+ * Delete a single object from R2
+ * @param key - R2 object key (path)
+ * @param bucket - R2 bucket name
+ */
+export async function deleteObject(
+  key: string,
+  bucket: string
+): Promise<void> {
+  const client = getR2Client();
+  const command = new DeleteObjectCommand({
+    Bucket: bucket,
+    Key: key,
+  });
+  await client.send(command);
+}
+
+/**
+ * Delete multiple objects from R2 in a single request
+ * @param keys - Array of R2 object keys (paths)
+ * @param bucket - R2 bucket name
+ */
+export async function deleteObjects(
+  keys: string[],
+  bucket: string
+): Promise<void> {
+  if (keys.length === 0) return;
+
+  const client = getR2Client();
+  const command = new DeleteObjectsCommand({
+    Bucket: bucket,
+    Delete: {
+      Objects: keys.map(key => ({ Key: key })),
+      Quiet: true,
+    },
+  });
+  await client.send(command);
 }

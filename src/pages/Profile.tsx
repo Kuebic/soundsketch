@@ -2,23 +2,42 @@ import { useState } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useAuthActions } from '@convex-dev/auth/react';
 import { api } from '../../convex/_generated/api';
 import { Navbar } from '@/components/layout/Navbar';
 import { TrackCard } from '@/components/tracks/TrackCard';
 import { Button } from '@/components/ui/Button';
-import { Loader2, Music, Upload, Share2, Pencil } from 'lucide-react';
+import { Modal } from '@/components/ui/Modal';
+import { Loader2, Music, Upload, Share2, Pencil, Settings, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { TrackFilter } from '@/components/tracks/TrackFilter';
 
 export function Profile() {
   const viewer = useQuery(api.users.viewer);
   const updateName = useMutation(api.users.updateName);
+  const updateEmail = useMutation(api.users.updateEmail);
+  const deleteAccount = useMutation(api.users.deleteAccount);
   const myTracks = useQuery(api.tracks.getMyTracks);
   const sharedTracks = useQuery(api.tracks.getSharedWithMe);
   const navigate = useNavigate();
+  const { signOut } = useAuthActions();
 
-  const [editing, setEditing] = useState(false);
+  // Name editing state
+  const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [savingName, setSavingName] = useState(false);
+
+  // Email editing state
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
+
+  // Account settings state
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletionMode, setDeletionMode] = useState<'keep_comments' | 'delete_everything'>('keep_comments');
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
   const [myTracksFilter, setMyTracksFilter] = useState('');
   const [sharedFilter, setSharedFilter] = useState('');
 
@@ -29,16 +48,17 @@ export function Profile() {
     track.title.toLowerCase().includes(sharedFilter.toLowerCase())
   );
 
-  const handleStartEdit = () => {
+  // Name editing handlers
+  const handleStartEditName = () => {
     setNameInput(viewer?.name || '');
-    setEditing(true);
+    setEditingName(true);
   };
 
-  const handleCancel = () => {
-    setEditing(false);
+  const handleCancelName = () => {
+    setEditingName(false);
   };
 
-  const handleSave = async () => {
+  const handleSaveName = async () => {
     const trimmed = nameInput.trim();
     if (!trimmed) {
       toast.error('Name cannot be empty');
@@ -49,14 +69,65 @@ export function Profile() {
       return;
     }
     try {
-      setSaving(true);
+      setSavingName(true);
       await updateName({ name: trimmed });
-      setEditing(false);
+      setEditingName(false);
       toast.success('Name updated');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update name');
     } finally {
-      setSaving(false);
+      setSavingName(false);
+    }
+  };
+
+  // Email editing handlers
+  const handleStartEditEmail = () => {
+    setEmailInput(viewer?.email || '');
+    setEditingEmail(true);
+  };
+
+  const handleCancelEmail = () => {
+    setEditingEmail(false);
+  };
+
+  const handleSaveEmail = async () => {
+    const trimmed = emailInput.trim().toLowerCase();
+    if (!trimmed) {
+      toast.error('Email cannot be empty');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmed)) {
+      toast.error('Invalid email format');
+      return;
+    }
+    try {
+      setSavingEmail(true);
+      await updateEmail({ email: trimmed });
+      setEditingEmail(false);
+      toast.success('Email updated');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update email');
+    } finally {
+      setSavingEmail(false);
+    }
+  };
+
+  // Account deletion handler
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== 'DELETE') {
+      toast.error('Please type DELETE to confirm');
+      return;
+    }
+    try {
+      setDeleting(true);
+      await deleteAccount({ deletionMode });
+      await signOut();
+      toast.success('Account deleted successfully');
+      navigate('/');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete account');
+      setDeleting(false);
     }
   };
 
@@ -84,8 +155,9 @@ export function Profile() {
       <main className="container mx-auto px-4 py-12">
         {/* User Info */}
         <div className="card mb-8 max-w-md">
-          {editing ? (
-            <div className="space-y-3">
+          {/* Name Section */}
+          {editingName ? (
+            <div className="space-y-3 mb-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Display Name</label>
                 <input
@@ -95,38 +167,73 @@ export function Profile() {
                   className="input"
                   maxLength={50}
                   autoFocus
-                  disabled={saving}
+                  disabled={savingName}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') void handleSave();
-                    if (e.key === 'Escape') handleCancel();
+                    if (e.key === 'Enter') void handleSaveName();
+                    if (e.key === 'Escape') handleCancelName();
                   }}
                 />
               </div>
               <div className="flex gap-2">
-                <Button size="sm" onClick={() => void handleSave()} disabled={saving || !nameInput.trim()}>
-                  {saving ? 'Saving...' : 'Save'}
+                <Button size="sm" onClick={() => void handleSaveName()} disabled={savingName || !nameInput.trim()}>
+                  {savingName ? 'Saving...' : 'Save'}
                 </Button>
-                <Button size="sm" variant="secondary" onClick={handleCancel} disabled={saving}>
+                <Button size="sm" variant="secondary" onClick={handleCancelName} disabled={savingName}>
                   Cancel
                 </Button>
               </div>
             </div>
           ) : (
-            <>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-2xl font-bold">{viewer.name || 'Anonymous'}</h1>
-                <button
-                  onClick={handleStartEdit}
-                  className="p-1.5 hover:bg-studio-dark rounded-lg transition-colors text-studio-text-secondary hover:text-studio-accent"
-                  title="Edit name"
-                >
-                  <Pencil className="w-4 h-4" />
-                </button>
+            <div className="flex items-center gap-3 mb-4">
+              <h1 className="text-2xl font-bold">{viewer.name || 'Anonymous'}</h1>
+              <button
+                onClick={handleStartEditName}
+                className="p-1.5 hover:bg-studio-dark rounded-lg transition-colors text-studio-text-secondary hover:text-studio-accent"
+                title="Edit name"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Email Section */}
+          {editingEmail ? (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium mb-2">Email</label>
+                <input
+                  type="email"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  className="input"
+                  autoFocus
+                  disabled={savingEmail}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleSaveEmail();
+                    if (e.key === 'Escape') handleCancelEmail();
+                  }}
+                />
               </div>
-              {viewer.email && (
-                <p className="text-sm text-studio-text-secondary">{viewer.email}</p>
-              )}
-            </>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => void handleSaveEmail()} disabled={savingEmail || !emailInput.trim()}>
+                  {savingEmail ? 'Saving...' : 'Save'}
+                </Button>
+                <Button size="sm" variant="secondary" onClick={handleCancelEmail} disabled={savingEmail}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-studio-text-secondary">{viewer.email || 'No email set'}</p>
+              <button
+                onClick={handleStartEditEmail}
+                className="p-1 hover:bg-studio-dark rounded-lg transition-colors text-studio-text-secondary hover:text-studio-accent"
+                title="Edit email"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            </div>
           )}
         </div>
 
@@ -232,6 +339,147 @@ export function Profile() {
             </div>
           )}
         </section>
+
+        {/* Account Settings */}
+        <section className="mt-12">
+          <button
+            onClick={() => setSettingsExpanded(!settingsExpanded)}
+            className="flex items-center gap-2 text-studio-text-secondary hover:text-studio-text transition-colors"
+          >
+            <Settings className="w-5 h-5" />
+            <span className="text-lg font-medium">Account Settings</span>
+            {settingsExpanded ? (
+              <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
+          </button>
+
+          {settingsExpanded && (
+            <div className="mt-4 card border-red-500/30 max-w-md">
+              <div className="flex items-center gap-2 text-red-400 mb-3">
+                <AlertTriangle className="w-5 h-5" />
+                <h3 className="font-semibold">Danger Zone</h3>
+              </div>
+              <p className="text-sm text-studio-text-secondary mb-4">
+                Once you delete your account, there is no going back. Please be certain.
+              </p>
+              <Button
+                variant="danger"
+                onClick={() => setDeleteModalOpen(true)}
+              >
+                Delete Account
+              </Button>
+            </div>
+          )}
+        </section>
+
+        {/* Delete Account Modal */}
+        <Modal
+          isOpen={deleteModalOpen}
+          onClose={() => {
+            setDeleteModalOpen(false);
+            setDeleteConfirmation('');
+            setDeletionMode('keep_comments');
+          }}
+          title="Delete Account"
+        >
+          <div className="space-y-6">
+            <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-red-400">This action cannot be undone</p>
+                  <p className="text-sm text-studio-text-secondary mt-1">
+                    This will permanently delete your account, all your tracks, versions, and associated data.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-3">
+                What should happen to your comments on other people&apos;s tracks?
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-start gap-3 p-3 border border-studio-gray rounded-lg cursor-pointer hover:border-studio-accent/50 transition-colors">
+                  <input
+                    type="radio"
+                    name="deletionMode"
+                    value="keep_comments"
+                    checked={deletionMode === 'keep_comments'}
+                    onChange={() => setDeletionMode('keep_comments')}
+                    className="mt-1"
+                  />
+                  <div>
+                    <span className="font-medium">Keep my comments (anonymized)</span>
+                    <p className="text-sm text-studio-text-secondary mt-0.5">
+                      Your comments will remain but be attributed to &quot;Deleted User&quot;
+                    </p>
+                  </div>
+                </label>
+                <label className="flex items-start gap-3 p-3 border border-studio-gray rounded-lg cursor-pointer hover:border-studio-accent/50 transition-colors">
+                  <input
+                    type="radio"
+                    name="deletionMode"
+                    value="delete_everything"
+                    checked={deletionMode === 'delete_everything'}
+                    onChange={() => setDeletionMode('delete_everything')}
+                    className="mt-1"
+                  />
+                  <div>
+                    <span className="font-medium">Delete all my data</span>
+                    <p className="text-sm text-studio-text-secondary mt-0.5">
+                      Remove everything including all comments on other tracks
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Type <span className="font-mono text-red-400">DELETE</span> to confirm
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                className="input font-mono"
+                placeholder="DELETE"
+                disabled={deleting}
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="danger"
+                onClick={() => void handleDeleteAccount()}
+                disabled={deleting || deleteConfirmation !== 'DELETE'}
+                className="flex-1"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete My Account'
+                )}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setDeleteModalOpen(false);
+                  setDeleteConfirmation('');
+                }}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </main>
     </div>
   );

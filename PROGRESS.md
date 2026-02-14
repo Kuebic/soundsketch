@@ -76,6 +76,7 @@
 | Rate limiting (uploads) | Done | 5 uploads/hour per user via `checkRateLimit` in `convex/versions.ts` |
 | Anonymous user identification | Done | Persistent identity via localStorage (`anonymousId`), funny generated names (adjective-animal), edit/delete authorization, comment claiming on signup/login |
 | Username-based authentication | Done | Username field in schema, login via username or email, optional email on signup, password confirmation |
+| Account management | Done | Email editing, account deletion with two modes: "keep_comments" (anonymize) or "delete_everything" (full removal). Cascading deletion of tracks, versions, comments, R2 files, and trackAccess records |
 
 ---
 
@@ -98,11 +99,11 @@
 | `convex/versions.ts` | create (rate-limited), getByTrack, getById, deleteVersion (w/ fallback) | Done |
 | `convex/comments.ts` | create (guest-friendly, private-track access gated, rate-limited), getByVersion, getTimestampComments (w/ includeAllVersions), getGeneralComments (w/ includeAllVersions), getReplies, deleteComment, updateComment, claimAnonymousComments | Done |
 | `convex/migrations.ts` | migrateVisibility (one-time: isPublic → visibility) | Temporary — delete after running |
-| `convex/r2.ts` | getTrackUploadUrl, getTrackDownloadUrl, getAttachmentDownloadUrl, getAttachmentUploadUrl | Done |
-| `convex/users.ts` | viewer (returns `_id` from users table), searchByEmail, getTrackParticipants, updateName (w/ denormalized creatorName propagation), checkUsernameAvailable | Done |
+| `convex/r2.ts` | getTrackUploadUrl, getTrackDownloadUrl, getAttachmentDownloadUrl, getAttachmentUploadUrl, deleteR2Objects | Done |
+| `convex/users.ts` | viewer (returns `_id` from users table), searchByEmail, getTrackParticipants, updateName (w/ denormalized creatorName propagation), checkUsernameAvailable, updateEmail, deleteAccount (w/ deletion mode: keep_comments or delete_everything) | Done |
 | `convex/auth.ts` | Convex Auth with Password provider, custom profile extracts name + username on signup | Done |
 | `convex/http.ts` | Auth HTTP routes | Done |
-| `convex/lib/r2Client.ts` | S3-compatible R2 client, generateUploadUrl, generateDownloadUrl | Done |
+| `convex/lib/r2Client.ts` | S3-compatible R2 client, generateUploadUrl, generateDownloadUrl, deleteObject, deleteObjects | Done |
 | `convex/lib/rateLimit.ts` | Reusable `checkRateLimit` helper — sliding window rate limiter backed by `rateLimits` table | Done |
 
 ---
@@ -149,7 +150,7 @@
 | Login | `/login` | Done — email/password, sign in/sign up toggle |
 | Track Detail | `/track/:shareableId` | Done — player, versions, comments (w/ cross-version toggle), settings |
 | Upload | `/upload` | Done — file drop, form, progress bar, redirect |
-| Profile | `/profile` | Done — user info with inline name editing, track grid with privacy badges + filter, shared tracks section with filter |
+| Profile | `/profile` | Done — user info with inline name + email editing, track grid with privacy badges + filter, shared tracks section with filter, account settings with delete account (two modes: anonymize comments or delete everything) |
 
 ### Components (25 total)
 

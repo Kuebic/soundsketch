@@ -2,7 +2,7 @@
 
 import { action } from "./_generated/server";
 import { v } from "convex/values";
-import { generateUploadUrl, generateDownloadUrl } from "./lib/r2Client";
+import { generateUploadUrl, generateDownloadUrl, deleteObjects } from "./lib/r2Client";
 
 const BUCKET_NAME = process.env.R2_BUCKET_NAME || "soundsketch-files";
 
@@ -82,5 +82,19 @@ export const getAttachmentUploadUrl = action({
     const uploadUrl = await generateUploadUrl(r2Key, BUCKET_NAME);
 
     return { uploadUrl, r2Key };
+  },
+});
+
+/**
+ * Delete multiple objects from R2
+ * Used for cleanup when deleting tracks, versions, or accounts
+ */
+export const deleteR2Objects = action({
+  args: {
+    r2Keys: v.array(v.string()),
+  },
+  handler: async (_ctx, args): Promise<void> => {
+    if (args.r2Keys.length === 0) return;
+    await deleteObjects(args.r2Keys, BUCKET_NAME);
   },
 });

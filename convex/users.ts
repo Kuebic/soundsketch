@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { api } from "./_generated/api";
 
 /**
  * Get the currently authenticated user.
@@ -159,5 +160,148 @@ export const resolveLoginIdentifier = query({
     }
 
     return { email: user.email };
+  },
+});
+
+/**
+ * Update the current user's email.
+ */
+export const updateEmail = mutation({
+  args: {
+    email: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const trimmed = args.email.trim().toLowerCase();
+
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmed)) {
+      throw new Error("Invalid email format");
+    }
+
+    // Check if email is already taken by another user
+    const existing = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", trimmed))
+      .first();
+
+    if (existing && existing._id !== userId) {
+      throw new Error("Email is already in use");
+    }
+
+    await ctx.db.patch(userId, { email: trimmed });
+  },
+});
+
+/**
+ * Delete the current user's account and associated data.
+ * @param deletionMode - "keep_comments" to anonymize comments, "delete_everything" to remove all
+ */
+export const deleteAccount = mutation({
+  args: {
+    deletionMode: v.union(v.literal("keep_comments"), v.literal("delete_everything")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+
+    const r2KeysToDelete: string[] = [];
+
+    // 1. Find and delete all user's tracks and their associated data
+    const userTracks = await ctx.db
+      .query("tracks")
+      .withIndex("by_creator", (q) => q.eq("creatorId", userId))
+      .collect();
+
+    for (const track of userTracks) {
+      // Get all versions for this track
+      const versions = await ctx.db
+        .query("versions")
+        .withIndex("by_track", (q) => q.eq("trackId", track._id))
+        .collect();
+
+      // Collect R2 keys and delete versions
+      for (const version of versions) {
+        r2KeysToDelete.push(version.r2Key);
+        await ctx.db.delete(version._id);
+      }
+
+      // Delete all comments on this track
+      const trackComments = await ctx.db
+        .query("comments")
+        .withIndex("by_track", (q) => q.eq("trackId", track._id))
+        .collect();
+
+      for (const comment of trackComments) {
+        if (comment.attachmentR2Key) {
+          r2KeysToDelete.push(comment.attachmentR2Key);
+        }
+        await ctx.db.delete(comment._id);
+      }
+
+      // Delete all access records for this track
+      const accessRecords = await ctx.db
+        .query("trackAccess")
+        .withIndex("by_track", (q) => q.eq("trackId", track._id))
+        .collect();
+
+      for (const record of accessRecords) {
+        await ctx.db.delete(record._id);
+      }
+
+      // Delete the track itself
+      await ctx.db.delete(track._id);
+    }
+
+    // 2. Handle user's comments on OTHER people's tracks
+    // We need to find all comments by this user across all tracks
+    const allComments = await ctx.db.query("comments").collect();
+    const userCommentsOnOtherTracks = allComments.filter(
+      (c) => c.authorId === userId && !userTracks.some((t) => t._id === c.trackId)
+    );
+
+    for (const comment of userCommentsOnOtherTracks) {
+      if (args.deletionMode === "delete_everything") {
+        // Delete the comment entirely
+        if (comment.attachmentR2Key) {
+          r2KeysToDelete.push(comment.attachmentR2Key);
+        }
+        await ctx.db.delete(comment._id);
+      } else {
+        // Anonymize the comment - keep content but remove author association
+        await ctx.db.patch(comment._id, {
+          authorId: undefined,
+          authorName: "Deleted User",
+        });
+      }
+    }
+
+    // 3. Delete trackAccess records where user is a collaborator
+    const userAccessRecords = await ctx.db
+      .query("trackAccess")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    for (const record of userAccessRecords) {
+      await ctx.db.delete(record._id);
+    }
+
+    // 4. Delete the user record
+    await ctx.db.delete(userId);
+
+    // 5. Schedule R2 file deletion (async to not block the mutation)
+    if (r2KeysToDelete.length > 0) {
+      await ctx.scheduler.runAfter(0, api.r2.deleteR2Objects, {
+        r2Keys: r2KeysToDelete,
+      });
+    }
+
+    return { deleted: true };
   },
 });
