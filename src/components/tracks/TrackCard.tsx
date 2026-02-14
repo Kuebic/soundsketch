@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Clock, User, Lock, Globe } from 'lucide-react';
+import { Clock, User, Lock, Globe, Link2 } from 'lucide-react';
 import { formatRelativeTime } from '@/lib/utils';
 import type { Track } from '@/types';
 
@@ -26,12 +26,10 @@ export function TrackCard({ track, showPrivacyBadge }: TrackCardProps) {
         </div>
         {showPrivacyBadge && (
           <span className="flex items-center gap-1 text-xs text-studio-text-secondary">
-            {track.isPublic ? (
-              <Globe className="w-3 h-3" />
-            ) : (
-              <Lock className="w-3 h-3" />
-            )}
-            {track.isPublic ? 'Public' : 'Private'}
+            {track.visibility === "public" && <Globe className="w-3 h-3" />}
+            {track.visibility === "unlisted" && <Link2 className="w-3 h-3" />}
+            {track.visibility === "private" && <Lock className="w-3 h-3" />}
+            {track.visibility === "public" ? "Public" : track.visibility === "unlisted" ? "Unlisted" : "Private"}
           </span>
         )}
       </div>

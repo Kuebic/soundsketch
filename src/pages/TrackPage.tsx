@@ -14,7 +14,7 @@ import { CommentList } from '@/components/comments/CommentList';
 import { Button } from '@/components/ui/Button';
 import { PlayerErrorFallback } from '@/components/ui/PlayerErrorFallback';
 import { formatDuration } from '@/lib/utils';
-import { Loader2, Globe, Lock, Plus, X, Clock, MessageCircle, Layers } from 'lucide-react';
+import { Loader2, Globe, Lock, Link2, Plus, X, Clock, MessageCircle, Layers } from 'lucide-react';
 import type { VersionId } from '@/types';
 
 export function TrackPage() {
@@ -108,8 +108,10 @@ export function TrackPage() {
             </div>
             <div className="flex items-center gap-2 flex-shrink-0 self-start">
               <span className="flex items-center gap-1 text-xs text-studio-text-secondary">
-                {track.isPublic ? <Globe className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-                {track.isPublic ? 'Public' : 'Private'}
+                {track.visibility === "public" && <Globe className="w-3.5 h-3.5" />}
+                {track.visibility === "unlisted" && <Link2 className="w-3.5 h-3.5" />}
+                {track.visibility === "private" && <Lock className="w-3.5 h-3.5" />}
+                {track.visibility === "public" ? "Public" : track.visibility === "unlisted" ? "Unlisted" : "Private"}
               </span>
               <ShareButton shareableId={track.shareableId} />
               {isOwner && <TrackSettingsDropdown track={track} />}
@@ -205,6 +207,17 @@ export function TrackPage() {
               onCancel={() => setTimestampForComment(null)}
               placeholder="Add feedback at this timestamp..."
             />
+          </div>
+        )}
+
+        {/* Anonymous viewer warning */}
+        {!viewer && selectedVersionId && (
+          <div className="bg-studio-dark border border-studio-gray rounded-lg px-4 py-3 mb-6 text-sm text-studio-text-secondary">
+            <p>
+              You are not signed in. Comments will be posted as <strong className="text-studio-text-primary">Anonymous</strong>.{' '}
+              <Link to="/login" className="text-studio-accent hover:underline">Sign in</Link>{' '}
+              to use your name and view your comment history.
+            </p>
           </div>
         )}
 

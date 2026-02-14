@@ -17,7 +17,7 @@ export const create = mutation({
     attachmentFileName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Allow guest comments on public tracks
+    // Allow guest comments on public/unlisted tracks
     const userId = await getAuthUserId(ctx);
     let authorId: Id<"users"> | undefined;
     let authorName = "Anonymous";
@@ -27,6 +27,24 @@ export const create = mutation({
       if (user) {
         authorId = user._id;
         authorName = user.name ?? "Anonymous";
+      }
+    }
+
+    // Private tracks require authentication + creator/collaborator access
+    const track = await ctx.db.get(args.trackId);
+    if (!track) throw new Error("Track not found");
+
+    if (track.visibility === "private") {
+      if (!userId) throw new Error("Authentication required to comment on private tracks");
+      const isCreator = track.creatorId === userId;
+      const hasAccess = await ctx.db
+        .query("trackAccess")
+        .withIndex("by_track_and_user", (q) =>
+          q.eq("trackId", args.trackId).eq("userId", userId)
+        )
+        .first();
+      if (!isCreator && !hasAccess) {
+        throw new Error("Not authorized to comment on this track");
       }
     }
 

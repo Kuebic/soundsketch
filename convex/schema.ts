@@ -24,20 +24,20 @@ export default defineSchema({
     description: v.optional(v.string()),
     creatorId: v.id("users"),
     creatorName: v.string(), // denormalized for display
-    isPublic: v.boolean(),
+    visibility: v.union(v.literal("public"), v.literal("unlisted"), v.literal("private")),
     shareableId: v.string(), // unique short ID for URLs
     latestVersionId: v.optional(v.id("versions")), // Made optional for initial creation
   })
     .index("by_creator", ["creatorId"])
     .index("by_shareable_id", ["shareableId"])
-    .index("by_public", ["isPublic"])
+    .index("by_visibility", ["visibility"])
     .searchIndex("search_title", {
       searchField: "title",
-      filterFields: ["isPublic"],
+      filterFields: ["visibility"],
     })
     .searchIndex("search_creator", {
       searchField: "creatorName",
-      filterFields: ["isPublic"],
+      filterFields: ["visibility"],
     }),
 
   versions: defineTable({

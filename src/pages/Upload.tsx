@@ -7,7 +7,7 @@ import { useFileUpload } from '@/hooks/useFileUpload';
 import { Navbar } from '@/components/layout/Navbar';
 import { FileDropZone } from '@/components/upload/FileDropZone';
 import { Button } from '@/components/ui/Button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Globe, Link2, Lock } from 'lucide-react';
 
 export function Upload() {
   const viewer = useQuery(api.users.viewer);
@@ -18,7 +18,7 @@ export function Upload() {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [isPublic, setIsPublic] = useState(true);
+  const [visibility, setVisibility] = useState<"public" | "unlisted" | "private">("unlisted");
   const [versionName, setVersionName] = useState('v1');
 
   // Auth guard
@@ -47,7 +47,7 @@ export function Upload() {
       const { shareableId, trackId } = await createTrack({
         title: title.trim(),
         description: description.trim() || undefined,
-        isPublic,
+        visibility,
       });
 
       // Step 2: Upload file to R2 and save version metadata
@@ -100,33 +100,35 @@ export function Upload() {
             />
           </div>
 
-          {/* Privacy */}
+          {/* Visibility */}
           <div>
-            <label className="block text-sm font-medium mb-2">Privacy</label>
+            <label className="block text-sm font-medium mb-2">Visibility</label>
             <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setIsPublic(true)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isPublic
-                    ? 'bg-studio-accent text-white'
-                    : 'bg-studio-dark text-studio-text-secondary border border-studio-gray'
-                }`}
-              >
-                Public
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsPublic(false)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  !isPublic
-                    ? 'bg-studio-accent text-white'
-                    : 'bg-studio-dark text-studio-text-secondary border border-studio-gray'
-                }`}
-              >
-                Private
-              </button>
+              {([
+                { value: "public", label: "Public", Icon: Globe },
+                { value: "unlisted", label: "Unlisted", Icon: Link2 },
+                { value: "private", label: "Private", Icon: Lock },
+              ] as const).map(({ value, label, Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setVisibility(value)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    visibility === value
+                      ? 'bg-studio-accent text-white'
+                      : 'bg-studio-dark text-studio-text-secondary border border-studio-gray'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {label}
+                </button>
+              ))}
             </div>
+            <p className="text-xs text-studio-text-secondary mt-1.5">
+              {visibility === "public" && "Anyone can discover this track on the home page."}
+              {visibility === "unlisted" && "Only people with the link can view this track."}
+              {visibility === "private" && "Only you and invited collaborators can access this track."}
+            </p>
           </div>
 
           {/* Version Name */}

@@ -10,7 +10,9 @@ export const create = mutation({
   args: {
     title: v.string(),
     description: v.optional(v.string()),
-    isPublic: v.boolean(),
+    visibility: v.optional(
+      v.union(v.literal("public"), v.literal("unlisted"), v.literal("private"))
+    ),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -27,7 +29,7 @@ export const create = mutation({
       description: args.description,
       creatorId: user._id,
       creatorName: user.name ?? "Unknown",
-      isPublic: args.isPublic,
+      visibility: args.visibility ?? "unlisted",
       shareableId,
       latestVersionId: undefined,
     });
@@ -43,7 +45,7 @@ export const getPublicTracks = query({
   handler: async (ctx) => {
     const tracks = await ctx.db
       .query("tracks")
-      .withIndex("by_public", (q) => q.eq("isPublic", true))
+      .withIndex("by_visibility", (q) => q.eq("visibility", "public"))
       .order("desc")
       .take(50);
 
@@ -65,7 +67,7 @@ export const searchPublicTracks = query({
     if (!trimmed) {
       return ctx.db
         .query("tracks")
-        .withIndex("by_public", (q) => q.eq("isPublic", true))
+        .withIndex("by_visibility", (q) => q.eq("visibility", "public"))
         .order("desc")
         .take(50);
     }
@@ -74,13 +76,13 @@ export const searchPublicTracks = query({
       ctx.db
         .query("tracks")
         .withSearchIndex("search_title", (q) =>
-          q.search("title", trimmed).eq("isPublic", true)
+          q.search("title", trimmed).eq("visibility", "public")
         )
         .take(25),
       ctx.db
         .query("tracks")
         .withSearchIndex("search_creator", (q) =>
-          q.search("creatorName", trimmed).eq("isPublic", true)
+          q.search("creatorName", trimmed).eq("visibility", "public")
         )
         .take(25),
     ]);
@@ -113,34 +115,36 @@ export const getByShareableId = query({
 
     if (!track) return null;
 
-    // Check access permissions for private tracks
-    if (!track.isPublic) {
-      const userId = await getAuthUserId(ctx);
-      if (!userId) return null;
-
-      // Check if user is creator or has explicit access
-      const isCreator = track.creatorId === userId;
-      const hasAccess = await ctx.db
-        .query("trackAccess")
-        .withIndex("by_track_and_user", (q) =>
-          q.eq("trackId", track._id).eq("userId", userId)
-        )
-        .first();
-
-      if (!isCreator && !hasAccess) return null;
+    // Public and unlisted tracks are accessible to anyone with the link
+    if (track.visibility === "public" || track.visibility === "unlisted") {
+      return track;
     }
+
+    // Private tracks require authentication + creator/collaborator access
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    const isCreator = track.creatorId === userId;
+    const hasAccess = await ctx.db
+      .query("trackAccess")
+      .withIndex("by_track_and_user", (q) =>
+        q.eq("trackId", track._id).eq("userId", userId)
+      )
+      .first();
+
+    if (!isCreator && !hasAccess) return null;
 
     return track;
   },
 });
 
 /**
- * Update track privacy setting
+ * Update track visibility setting
  */
-export const updatePrivacy = mutation({
+export const updateVisibility = mutation({
   args: {
     trackId: v.id("tracks"),
-    isPublic: v.boolean(),
+    visibility: v.union(v.literal("public"), v.literal("unlisted"), v.literal("private")),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -154,7 +158,7 @@ export const updatePrivacy = mutation({
     }
 
     await ctx.db.patch(args.trackId, {
-      isPublic: args.isPublic,
+      visibility: args.visibility,
     });
   },
 });

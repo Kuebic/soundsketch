@@ -48,7 +48,8 @@
 | Convex Auth (email/password) | Done | `convex/auth.ts`, Password provider with custom profile (name on signup), `LoginForm` |
 | User profiles | Done | `Profile` page, `convex/users.ts` viewer query |
 | Private tracks + access control | Done | `trackAccess` table, `getByShareableId` access checks |
-| Privacy toggle | Done | `TrackSettingsDropdown`, `updatePrivacy` mutation |
+| Unlisted tracks | Done | Three-level visibility: public/unlisted/private. Unlisted tracks accessible via link but not listed on home page. |
+| Visibility settings | Done | `TrackSettingsDropdown`, `updateVisibility` mutation (replaces `updatePrivacy`) |
 | Track deletion | Done | `deleteTrack` mutation with confirmation modal |
 | Comment attachments | Done | `useAttachmentUpload` hook, `CommentForm` file picker, `CommentItem` download |
 | Show comments across versions | Done | `includeAllVersions` param in queries, toggle in `TrackPage` |
@@ -73,7 +74,7 @@
 ### Schema (`convex/schema.ts`)
 
 - **users** — Convex Auth fields + avatarUrl, tokenIdentifier. Indexes: email, by_token_identifier
-- **tracks** — title, description, creatorId, creatorName, isPublic, shareableId, latestVersionId. Indexes: by_creator, by_shareable_id, by_public. Search indexes: search_title (title, filterFields: isPublic), search_creator (creatorName, filterFields: isPublic)
+- **tracks** — title, description, creatorId, creatorName, visibility ("public" | "unlisted" | "private"), shareableId, latestVersionId. Indexes: by_creator, by_shareable_id, by_visibility. Search indexes: search_title (title, filterFields: visibility), search_creator (creatorName, filterFields: visibility)
 - **versions** — trackId, versionName, changeNotes, r2Key, r2Bucket, fileName, fileSize, fileFormat, duration, uploadedBy. Index: by_track
 - **comments** — versionId, trackId, authorId (optional), authorName, commentText, timestamp (optional), parentCommentId (threading), attachmentR2Key, attachmentFileName. Indexes: by_version, by_track, by_parent, by_timestamp
 - **trackAccess** — trackId, userId, grantedBy, grantedAt. Indexes: by_track, by_user, by_track_and_user
@@ -82,9 +83,10 @@
 
 | File | Functions | Status |
 |------|-----------|--------|
-| `convex/tracks.ts` | create, getPublicTracks, searchPublicTracks, getByShareableId (w/ access control), getMyTracks, updatePrivacy, deleteTrack, grantAccess, revokeAccess, getCollaborators, getSharedWithMe | Done |
+| `convex/tracks.ts` | create, getPublicTracks, searchPublicTracks, getByShareableId (w/ access control), getMyTracks, updateVisibility, deleteTrack, grantAccess, revokeAccess, getCollaborators, getSharedWithMe | Done |
 | `convex/versions.ts` | create, getByTrack, getById, deleteVersion (w/ fallback) | Done |
-| `convex/comments.ts` | create (guest-friendly), getByVersion, getTimestampComments (w/ includeAllVersions), getGeneralComments (w/ includeAllVersions), getReplies, deleteComment, updateComment | Done |
+| `convex/comments.ts` | create (guest-friendly, private-track access gated), getByVersion, getTimestampComments (w/ includeAllVersions), getGeneralComments (w/ includeAllVersions), getReplies, deleteComment, updateComment | Done |
+| `convex/migrations.ts` | migrateVisibility (one-time: isPublic → visibility) | Temporary — delete after running |
 | `convex/r2.ts` | getTrackUploadUrl, getTrackDownloadUrl, getAttachmentDownloadUrl, getAttachmentUploadUrl | Done |
 | `convex/users.ts` | viewer (returns `_id` from users table), searchByEmail, getTrackParticipants, updateName (w/ denormalized creatorName propagation) | Done |
 | `convex/auth.ts` | Convex Auth with Password provider, custom profile extracts name on signup | Done |

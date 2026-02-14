@@ -6,7 +6,7 @@ import { api } from '../../../convex/_generated/api';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { ManageCollaboratorsModal } from './ManageCollaboratorsModal';
-import { Settings, Globe, Lock, Trash2, Users } from 'lucide-react';
+import { Settings, Globe, Lock, Link2, Trash2, Users } from 'lucide-react';
 import type { Track } from '@/types';
 
 interface TrackSettingsDropdownProps {
@@ -20,16 +20,16 @@ export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
   const [deleting, setDeleting] = useState(false);
 
   const navigate = useNavigate();
-  const updatePrivacy = useMutation(api.tracks.updatePrivacy);
+  const updateVisibility = useMutation(api.tracks.updateVisibility);
   const deleteTrack = useMutation(api.tracks.deleteTrack);
 
-  const handlePrivacyToggle = async () => {
+  const handleVisibilityChange = async (newVisibility: "public" | "unlisted" | "private") => {
     try {
-      await updatePrivacy({ trackId: track._id, isPublic: !track.isPublic });
-      toast.success(track.isPublic ? 'Track set to private' : 'Track set to public');
+      await updateVisibility({ trackId: track._id, visibility: newVisibility });
+      toast.success(`Track set to ${newVisibility}`);
       setOpen(false);
     } catch {
-      toast.error('Failed to update privacy');
+      toast.error('Failed to update visibility');
     }
   };
 
@@ -61,22 +61,22 @@ export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
           <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
 
           <div className="absolute right-0 top-full mt-2 w-48 bg-studio-darker border border-studio-gray rounded-lg shadow-lg z-30 overflow-hidden">
-            <button
-              onClick={handlePrivacyToggle}
-              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-studio-dark text-left"
-            >
-              {track.isPublic ? (
-                <>
-                  <Lock className="w-4 h-4" />
-                  Make Private
-                </>
-              ) : (
-                <>
-                  <Globe className="w-4 h-4" />
-                  Make Public
-                </>
-              )}
-            </button>
+            {([
+              { value: "public" as const, label: "Make Public", Icon: Globe },
+              { value: "unlisted" as const, label: "Make Unlisted", Icon: Link2 },
+              { value: "private" as const, label: "Make Private", Icon: Lock },
+            ])
+              .filter(({ value }) => value !== track.visibility)
+              .map(({ value, label, Icon }) => (
+                <button
+                  key={value}
+                  onClick={() => handleVisibilityChange(value)}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-studio-dark text-left"
+                >
+                  <Icon className="w-4 h-4" />
+                  {label}
+                </button>
+              ))}
             <button
               onClick={() => { setOpen(false); setShowCollaborators(true); }}
               className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-studio-dark text-left"
