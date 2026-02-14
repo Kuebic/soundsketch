@@ -30,7 +30,15 @@ export default defineSchema({
   })
     .index("by_creator", ["creatorId"])
     .index("by_shareable_id", ["shareableId"])
-    .index("by_public", ["isPublic"]),
+    .index("by_public", ["isPublic"])
+    .searchIndex("search_title", {
+      searchField: "title",
+      filterFields: ["isPublic"],
+    })
+    .searchIndex("search_creator", {
+      searchField: "creatorName",
+      filterFields: ["isPublic"],
+    }),
 
   versions: defineTable({
     trackId: v.id("tracks"),

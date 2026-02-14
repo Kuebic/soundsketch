@@ -4,6 +4,7 @@ import { useQuery } from "convex/react";
 import { api } from '../../../convex/_generated/api';
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Button } from '../ui/Button';
+import { SearchBar } from './SearchBar';
 
 export function Navbar() {
   const viewer = useQuery(api.users.viewer);
@@ -20,6 +21,9 @@ export function Navbar() {
             <Music className="w-6 h-6 text-studio-accent" />
             <span className="text-xl font-bold gradient-text">SoundSketch</span>
           </Link>
+
+          {/* Search Bar */}
+          <SearchBar />
 
           {/* Actions */}
           <div className="flex items-center space-x-2 sm:space-x-4">

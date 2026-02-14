@@ -52,6 +52,55 @@ export const getPublicTracks = query({
 });
 
 /**
+ * Search public tracks by title or creator name.
+ * Falls back to default public listing when searchText is empty.
+ */
+export const searchPublicTracks = query({
+  args: {
+    searchText: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const trimmed = args.searchText.trim();
+
+    if (!trimmed) {
+      return ctx.db
+        .query("tracks")
+        .withIndex("by_public", (q) => q.eq("isPublic", true))
+        .order("desc")
+        .take(50);
+    }
+
+    const [titleResults, creatorResults] = await Promise.all([
+      ctx.db
+        .query("tracks")
+        .withSearchIndex("search_title", (q) =>
+          q.search("title", trimmed).eq("isPublic", true)
+        )
+        .take(25),
+      ctx.db
+        .query("tracks")
+        .withSearchIndex("search_creator", (q) =>
+          q.search("creatorName", trimmed).eq("isPublic", true)
+        )
+        .take(25),
+    ]);
+
+    // Deduplicate by _id, title matches take priority
+    const seen = new Set<string>();
+    const merged = [];
+    for (const track of [...titleResults, ...creatorResults]) {
+      const id = track._id.toString();
+      if (!seen.has(id)) {
+        seen.add(id);
+        merged.push(track);
+      }
+    }
+
+    return merged;
+  },
+});
+
+/**
  * Get track by shareable ID with access control
  */
 export const getByShareableId = query({

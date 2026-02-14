@@ -73,7 +73,7 @@
 ### Schema (`convex/schema.ts`)
 
 - **users** — Convex Auth fields + avatarUrl, tokenIdentifier. Indexes: email, by_token_identifier
-- **tracks** — title, description, creatorId, creatorName, isPublic, shareableId, latestVersionId. Indexes: by_creator, by_shareable_id, by_public
+- **tracks** — title, description, creatorId, creatorName, isPublic, shareableId, latestVersionId. Indexes: by_creator, by_shareable_id, by_public. Search indexes: search_title (title, filterFields: isPublic), search_creator (creatorName, filterFields: isPublic)
 - **versions** — trackId, versionName, changeNotes, r2Key, r2Bucket, fileName, fileSize, fileFormat, duration, uploadedBy. Index: by_track
 - **comments** — versionId, trackId, authorId (optional), authorName, commentText, timestamp (optional), parentCommentId (threading), attachmentR2Key, attachmentFileName. Indexes: by_version, by_track, by_parent, by_timestamp
 - **trackAccess** — trackId, userId, grantedBy, grantedAt. Indexes: by_track, by_user, by_track_and_user
@@ -82,7 +82,7 @@
 
 | File | Functions | Status |
 |------|-----------|--------|
-| `convex/tracks.ts` | create, getPublicTracks, getByShareableId (w/ access control), getMyTracks, updatePrivacy, deleteTrack, grantAccess, revokeAccess, getCollaborators, getSharedWithMe | Done |
+| `convex/tracks.ts` | create, getPublicTracks, searchPublicTracks, getByShareableId (w/ access control), getMyTracks, updatePrivacy, deleteTrack, grantAccess, revokeAccess, getCollaborators, getSharedWithMe | Done |
 | `convex/versions.ts` | create, getByTrack, getById, deleteVersion (w/ fallback) | Done |
 | `convex/comments.ts` | create (guest-friendly), getByVersion, getTimestampComments (w/ includeAllVersions), getGeneralComments (w/ includeAllVersions), getReplies, deleteComment, updateComment | Done |
 | `convex/r2.ts` | getTrackUploadUrl, getTrackDownloadUrl, getAttachmentDownloadUrl, getAttachmentUploadUrl | Done |
@@ -119,22 +119,24 @@
 | `useAudioDuration` | `src/hooks/useAudioDuration.ts` | Extract duration from audio File via HTML5 Audio API |
 | `useAttachmentUpload` | `src/hooks/useAttachmentUpload.ts` | Attachment upload: validate → presigned URL → XHR to R2 with progress |
 | `useKeyboardShortcuts` | `src/hooks/useKeyboardShortcuts.ts` | Spacebar play/pause, arrow key seeking (±5s), input-aware |
+| `useDebounce` | `src/hooks/useDebounce.ts` | Generic debounce hook for search input |
 
 ### Pages
 
 | Page | Route | Status |
 |------|-------|--------|
-| Home | `/` | Done — hero section + public tracks grid (uses TrackCard) |
+| Home | `/` | Done — hero section + public tracks grid with search (title/creator, via URL `?q=` param) |
 | Login | `/login` | Done — email/password, sign in/sign up toggle |
 | Track Detail | `/track/:shareableId` | Done — player, versions, comments (w/ cross-version toggle), settings |
 | Upload | `/upload` | Done — file drop, form, progress bar, redirect |
-| Profile | `/profile` | Done — user info with inline name editing, track grid with privacy badges, shared tracks section |
+| Profile | `/profile` | Done — user info with inline name editing, track grid with privacy badges + filter, shared tracks section with filter |
 
-### Components (21 total)
+### Components (23 total)
 
 | Component | Location | Status |
 |-----------|----------|--------|
-| Navbar | `src/components/layout/Navbar.tsx` | Done — logo, auth-conditional buttons |
+| Navbar | `src/components/layout/Navbar.tsx` | Done — logo, search bar, auth-conditional buttons |
+| SearchBar | `src/components/layout/SearchBar.tsx` | Done — debounced search input, URL param sync, hidden on mobile |
 | Button | `src/components/ui/Button.tsx` | Done — primary/secondary/danger, sm/md/lg |
 | Modal | `src/components/ui/Modal.tsx` | Done — backdrop blur, ESC close, responsive sizes |
 | ErrorFallback | `src/components/ui/ErrorFallback.tsx` | Done — full-page error boundary fallback |
@@ -153,6 +155,7 @@
 | CommentList | `src/components/comments/CommentList.tsx` | Done — renders top-level comments |
 | TimestampMarker | `src/components/comments/TimestampMarker.tsx` | Done — waveform overlay markers |
 | MentionInput | `src/components/comments/MentionInput.tsx` | Done — textarea with @mention autocomplete dropdown |
+| TrackFilter | `src/components/tracks/TrackFilter.tsx` | Done — inline filter input for Profile page sections |
 | FileDropZone | `src/components/upload/FileDropZone.tsx` | Done — drag-drop + validation |
 
 ### Routing (`src/App.tsx`)

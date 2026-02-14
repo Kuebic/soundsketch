@@ -1,11 +1,16 @@
 import { useQuery } from 'convex/react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../../convex/_generated/api';
-import { Music } from 'lucide-react';
+import { Music, SearchX } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import { TrackCard } from '@/components/tracks/TrackCard';
 
 export function Home() {
-  const publicTracks = useQuery(api.tracks.getPublicTracks);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const searchQuery = searchParams.get('q') || '';
+  const tracks = useQuery(api.tracks.searchPublicTracks, { searchText: searchQuery });
+  const hasSearch = searchQuery.trim().length > 0;
 
   return (
     <div className="min-h-screen">
@@ -22,22 +27,51 @@ export function Home() {
           </p>
         </div>
 
-        {/* Public Tracks */}
+        {/* Tracks */}
         <section className="animate-slide-up">
-          <h2 className="text-2xl font-semibold mb-6">Public Tracks</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-semibold">
+              {hasSearch ? (
+                <>
+                  Results for <span className="text-studio-accent">&ldquo;{searchQuery}&rdquo;</span>
+                </>
+              ) : (
+                'Public Tracks'
+              )}
+            </h2>
+            {hasSearch && (
+              <button
+                onClick={() => navigate('/')}
+                className="text-sm text-studio-text-secondary hover:text-studio-accent transition-colors"
+              >
+                Clear search
+              </button>
+            )}
+          </div>
 
-          {publicTracks === undefined ? (
+          {tracks === undefined ? (
             <div className="text-studio-text-secondary">Loading tracks...</div>
-          ) : publicTracks.length === 0 ? (
+          ) : tracks.length === 0 ? (
             <div className="card text-center py-12">
-              <Music className="w-16 h-16 mx-auto mb-4 text-studio-gray" />
-              <p className="text-studio-text-secondary">
-                No public tracks yet. Be the first to share!
-              </p>
+              {hasSearch ? (
+                <>
+                  <SearchX className="w-16 h-16 mx-auto mb-4 text-studio-gray" />
+                  <p className="text-studio-text-secondary">
+                    No tracks found for &ldquo;{searchQuery}&rdquo;
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Music className="w-16 h-16 mx-auto mb-4 text-studio-gray" />
+                  <p className="text-studio-text-secondary">
+                    No public tracks yet. Be the first to share!
+                  </p>
+                </>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {publicTracks.map((track) => (
+              {tracks.map((track) => (
                 <TrackCard key={track._id} track={track} />
               ))}
             </div>
