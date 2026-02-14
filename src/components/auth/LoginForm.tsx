@@ -29,7 +29,6 @@ export function LoginForm() {
 
   // Sign up fields
   const [username, setUsername] = useState('');
-  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
@@ -76,7 +75,7 @@ export function LoginForm() {
           email: effectiveEmail,
           password,
           flow: "signUp",
-          name: displayName.trim() || username.trim(),
+          name: username.trim(),
           username: username.trim().toLowerCase(),
         });
       } catch (err) {
@@ -131,22 +130,6 @@ export function LoginForm() {
               <p className="text-xs text-studio-text-secondary mt-1">
                 Letters, numbers, and underscores only
               </p>
-            </div>
-
-            {/* Display Name (optional) */}
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Display Name <span className="text-studio-text-secondary">(optional)</span>
-              </label>
-              <input
-                type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Your display name"
-                className="input"
-                disabled={loading}
-                maxLength={50}
-              />
             </div>
 
             {/* Email (optional) */}
