@@ -132,3 +132,32 @@ export const checkUsernameAvailable = query({
     return existing === null;
   },
 });
+
+/**
+ * Resolve a login identifier (username or email) to the actual email.
+ * Used during login to support username-based login for accounts that have usernames.
+ */
+export const resolveLoginIdentifier = query({
+  args: { identifier: v.string() },
+  handler: async (ctx, { identifier }) => {
+    const trimmed = identifier.trim().toLowerCase();
+    if (!trimmed) return null;
+
+    // If it looks like an email, return it as-is
+    if (trimmed.includes("@")) {
+      return { email: trimmed };
+    }
+
+    // Otherwise, look up by username
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", trimmed))
+      .first();
+
+    if (!user || !user.email) {
+      return null;
+    }
+
+    return { email: user.email };
+  },
+});

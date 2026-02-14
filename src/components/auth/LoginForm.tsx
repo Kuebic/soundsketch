@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useAuthActions } from "@convex-dev/auth/react";
+import { useConvex } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { Button } from '../ui/Button';
 import { Loader2 } from 'lucide-react';
 
@@ -36,6 +38,7 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { signIn } = useAuthActions();
+  const convex = useConvex();
 
   const validateUsername = (value: string): string | null => {
     const trimmed = value.trim();
@@ -85,8 +88,19 @@ export function LoginForm() {
       }
     } else {
       try {
+        // Resolve username to email first (supports username or email login)
+        const resolved = await convex.query(api.users.resolveLoginIdentifier, {
+          identifier: identifier.trim(),
+        });
+
+        if (!resolved) {
+          setError("No account found with that username or email.");
+          setLoading(false);
+          return;
+        }
+
         await signIn("password", {
-          email: identifier.trim(), // This is username or email
+          email: resolved.email,
           password,
           flow: "signIn",
         });
