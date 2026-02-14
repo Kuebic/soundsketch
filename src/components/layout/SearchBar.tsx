@@ -1,14 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
+import { cn } from '@/lib/utils';
 
-export function SearchBar() {
+interface SearchBarProps {
+  isMobileOverlay?: boolean;
+  onClose?: () => void;
+}
+
+export function SearchBar({ isMobileOverlay = false, onClose }: SearchBarProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryParam = searchParams.get('q') || '';
   const [inputValue, setInputValue] = useState(queryParam);
   const debouncedValue = useDebounce(inputValue, 400);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isMobileOverlay && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isMobileOverlay]);
 
   // Sync input when URL param changes externally (e.g. navigating to /)
   useEffect(() => {
@@ -40,14 +53,22 @@ export function SearchBar() {
       }
     }
     if (e.key === 'Escape') {
-      handleClear();
+      if (isMobileOverlay && onClose) {
+        onClose();
+      } else {
+        handleClear();
+      }
     }
   };
 
   return (
-    <div className="relative hidden sm:flex flex-1 max-w-md mx-4">
+    <div className={cn(
+      "relative flex-1",
+      isMobileOverlay ? "flex" : "hidden sm:flex max-w-md mx-4"
+    )}>
       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-studio-text-secondary pointer-events-none" />
       <input
+        ref={inputRef}
         type="text"
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
