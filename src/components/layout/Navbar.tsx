@@ -22,7 +22,7 @@ export function Navbar() {
           </Link>
 
           {/* Actions */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             {!isLoading && (
               <>
                 {isAuthenticated ? (
@@ -30,7 +30,7 @@ export function Navbar() {
                     <Link to="/upload">
                       <Button size="sm" className="flex items-center space-x-2">
                         <Upload className="w-4 h-4" />
-                        <span>Upload</span>
+                        <span className="hidden sm:inline">Upload</span>
                       </Button>
                     </Link>
                     <Link to="/profile">

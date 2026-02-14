@@ -14,10 +14,10 @@ export function Home() {
       <main className="container mx-auto px-4 py-12">
         {/* Hero Section */}
         <div className="mb-12 animate-fade-in text-center">
-          <h1 className="text-6xl font-bold mb-4 gradient-text">
+          <h1 className="text-4xl sm:text-6xl font-bold mb-4 gradient-text">
             SoundSketch
           </h1>
-          <p className="text-xl text-studio-text-secondary mono">
+          <p className="text-base sm:text-xl text-studio-text-secondary mono">
             Collaborate on music with timestamp-precise feedback
           </p>
         </div>

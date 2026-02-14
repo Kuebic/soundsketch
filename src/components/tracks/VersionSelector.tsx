@@ -16,8 +16,8 @@ export function VersionSelector({
   const currentVersion = versions.find((v) => v._id === currentVersionId);
 
   return (
-    <div className="flex items-center gap-3">
-      <span className="text-sm text-studio-text-secondary mono">Version:</span>
+    <div className="flex items-center gap-2 sm:gap-3">
+      <span className="text-sm text-studio-text-secondary mono hidden sm:inline">Version:</span>
       <div className="relative">
         <select
           value={currentVersionId}
@@ -33,7 +33,7 @@ export function VersionSelector({
         <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-studio-text-secondary pointer-events-none" />
       </div>
       {currentVersion?.changeNotes && (
-        <span className="text-xs text-studio-text-secondary italic truncate max-w-xs">
+        <span className="text-xs text-studio-text-secondary italic truncate max-w-xs hidden sm:inline">
           {currentVersion.changeNotes}
         </span>
       )}

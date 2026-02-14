@@ -96,15 +96,15 @@ export function TrackPage() {
     <div className="min-h-screen">
       <Navbar />
 
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <main className="container mx-auto px-3 py-6 sm:px-4 sm:py-8 max-w-4xl">
         {/* Track Header */}
         <div className="mb-6">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
             <div className="flex-1 min-w-0">
-              <h1 className="text-3xl font-bold mb-1 truncate">{track.title}</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold mb-1 truncate">{track.title}</h1>
               <p className="text-studio-text-secondary">{track.creatorName}</p>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0 self-start">
               <span className="flex items-center gap-1 text-xs text-studio-text-secondary">
                 {track.isPublic ? <Globe className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
                 {track.isPublic ? 'Public' : 'Private'}
@@ -121,7 +121,7 @@ export function TrackPage() {
         {/* Version Selector */}
         {versions && versions.length > 0 && selectedVersionId && (
           <div className="mb-4 space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <VersionSelector
                 versions={versions}
                 currentVersionId={selectedVersionId}

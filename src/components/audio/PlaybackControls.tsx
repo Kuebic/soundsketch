@@ -67,7 +67,7 @@ export function PlaybackControls({
       </div>
 
       {/* Controls */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between sm:gap-0">
         {/* Play/Pause */}
         <button
           onClick={onPlayPause}
@@ -80,41 +80,44 @@ export function PlaybackControls({
           )}
         </button>
 
-        {/* Volume */}
-        <div className="flex items-center space-x-2">
-          <button onClick={toggleMute} className="p-2 hover:bg-studio-dark rounded-lg transition-colors">
-            {isMuted || volume === 0 ? (
-              <VolumeX className="w-5 h-5" />
-            ) : (
-              <Volume2 className="w-5 h-5" />
-            )}
-          </button>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={isMuted ? 0 : volume}
-            onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-            className="w-24 h-2 bg-studio-dark rounded-lg appearance-none cursor-pointer accent-studio-accent"
-          />
-        </div>
+        {/* Volume + Speed: grouped row on mobile, direct children on desktop */}
+        <div className="flex items-center justify-between w-full sm:w-auto sm:contents">
+          {/* Volume */}
+          <div className="flex items-center space-x-2">
+            <button onClick={toggleMute} className="p-2 hover:bg-studio-dark rounded-lg transition-colors">
+              {isMuted || volume === 0 ? (
+                <VolumeX className="w-5 h-5" />
+              ) : (
+                <Volume2 className="w-5 h-5" />
+              )}
+            </button>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={isMuted ? 0 : volume}
+              onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+              className="w-24 h-2 bg-studio-dark rounded-lg appearance-none cursor-pointer accent-studio-accent"
+            />
+          </div>
 
-        {/* Playback Speed */}
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-studio-text-secondary mono">Speed:</span>
-          <select
-            value={playbackRate}
-            onChange={(e) => handleRateChange(parseFloat(e.target.value))}
-            className="bg-studio-dark border border-studio-gray rounded-lg px-3 py-1 text-sm mono cursor-pointer"
-          >
-            <option value="0.5">0.5x</option>
-            <option value="0.75">0.75x</option>
-            <option value="1">1x</option>
-            <option value="1.25">1.25x</option>
-            <option value="1.5">1.5x</option>
-            <option value="2">2x</option>
-          </select>
+          {/* Playback Speed */}
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-studio-text-secondary mono hidden sm:inline">Speed:</span>
+            <select
+              value={playbackRate}
+              onChange={(e) => handleRateChange(parseFloat(e.target.value))}
+              className="bg-studio-dark border border-studio-gray rounded-lg px-3 py-1 text-sm mono cursor-pointer"
+            >
+              <option value="0.5">0.5x</option>
+              <option value="0.75">0.75x</option>
+              <option value="1">1x</option>
+              <option value="1.25">1.25x</option>
+              <option value="1.5">1.5x</option>
+              <option value="2">2x</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>
