@@ -1,4 +1,4 @@
-import { query } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
@@ -82,5 +82,35 @@ export const getTrackParticipants = query({
     }
 
     return participants;
+  },
+});
+
+/**
+ * Update the current user's display name.
+ * Also propagates to denormalized creatorName on owned tracks.
+ */
+export const updateName = mutation({
+  args: {
+    name: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const trimmed = args.name.trim();
+    if (trimmed.length === 0) throw new Error("Name cannot be empty");
+    if (trimmed.length > 50) throw new Error("Name must be 50 characters or fewer");
+
+    await ctx.db.patch(userId, { name: trimmed });
+
+    // Update denormalized creatorName on all tracks owned by this user
+    const tracks = await ctx.db
+      .query("tracks")
+      .withIndex("by_creator", (q) => q.eq("creatorId", userId))
+      .collect();
+
+    for (const track of tracks) {
+      await ctx.db.patch(track._id, { creatorName: trimmed });
+    }
   },
 });

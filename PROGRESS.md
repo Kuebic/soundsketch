@@ -86,7 +86,7 @@
 | `convex/versions.ts` | create, getByTrack, getById, deleteVersion (w/ fallback) | Done |
 | `convex/comments.ts` | create (guest-friendly), getByVersion, getTimestampComments (w/ includeAllVersions), getGeneralComments (w/ includeAllVersions), getReplies, deleteComment, updateComment | Done |
 | `convex/r2.ts` | getTrackUploadUrl, getTrackDownloadUrl, getAttachmentDownloadUrl, getAttachmentUploadUrl | Done |
-| `convex/users.ts` | viewer (returns `_id` from users table), searchByEmail, getTrackParticipants | Done |
+| `convex/users.ts` | viewer (returns `_id` from users table), searchByEmail, getTrackParticipants, updateName (w/ denormalized creatorName propagation) | Done |
 | `convex/auth.ts` | Convex Auth with Password provider | Done |
 | `convex/http.ts` | Auth HTTP routes | Done |
 | `convex/lib/r2Client.ts` | S3-compatible R2 client, generateUploadUrl, generateDownloadUrl | Done |
@@ -124,7 +124,7 @@
 | Login | `/login` | Done — email/password, sign in/sign up toggle |
 | Track Detail | `/track/:shareableId` | Done — player, versions, comments (w/ cross-version toggle), settings |
 | Upload | `/upload` | Done — file drop, form, progress bar, redirect |
-| Profile | `/profile` | Done — user info, track grid with privacy badges, shared tracks section |
+| Profile | `/profile` | Done — user info with inline name editing, track grid with privacy badges, shared tracks section |
 
 ### Components (19 total)
 
