@@ -1,7 +1,17 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { nanoid } from "nanoid";
 import { getAuthUserId } from "@convex-dev/auth/server";
+
+/** Generate a short unique ID safe for the Convex mutation runtime. */
+function generateShareableId(length = 10): string {
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  let id = "";
+  for (let i = 0; i < length; i++) {
+    id += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return id;
+}
 
 /**
  * Create a new track
@@ -21,7 +31,7 @@ export const create = mutation({
     const user = await ctx.db.get(userId);
     if (!user) throw new Error("User not found");
 
-    const shareableId = nanoid(10); // Short unique ID for URLs
+    const shareableId = generateShareableId();
 
     // Create track without latestVersionId initially
     const trackId = await ctx.db.insert("tracks", {
