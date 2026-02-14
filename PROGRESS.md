@@ -51,7 +51,7 @@
 | Unlisted tracks | Done | Three-level visibility: public/unlisted/private. Unlisted tracks accessible via link but not listed on home page. |
 | Visibility settings | Done | `TrackSettingsDropdown`, `updateVisibility` mutation (replaces `updatePrivacy`) |
 | Track deletion | Done | `deleteTrack` mutation with confirmation modal |
-| Comment attachments | Done | `useAttachmentUpload` hook, `CommentForm` file picker, `CommentItem` download |
+| Comment attachments | Done | `useAttachmentUpload` hook, `CommentForm` file picker, inline previews: image thumbnails with fullscreen lightbox (`ImageLightbox`), audio player; download for all types |
 | Show comments across versions | Done | `includeAllVersions` param in queries, toggle in `TrackPage` |
 | Responsive design | Done | Tailwind responsive classes throughout |
 | Loading states + error handling | Done | Conditional rendering, error boundaries, toast notifications |
@@ -131,6 +131,7 @@
 | `useFileUpload` | `src/hooks/useFileUpload.ts` | Full upload pipeline: validate → presigned URL → XHR to R2 → save metadata |
 | `useAudioDuration` | `src/hooks/useAudioDuration.ts` | Extract duration from audio File via HTML5 Audio API |
 | `useAttachmentUpload` | `src/hooks/useAttachmentUpload.ts` | Attachment upload: validate → presigned URL → XHR to R2 with progress |
+| `useAttachmentUrl` | `src/hooks/useAttachmentUrl.ts` | Fetches + caches R2 attachment download URLs (55-min cache) for inline previews |
 | `useKeyboardShortcuts` | `src/hooks/useKeyboardShortcuts.ts` | Spacebar play/pause, arrow key seeking (±5s), input-aware |
 | `useDebounce` | `src/hooks/useDebounce.ts` | Generic debounce hook for search input |
 
@@ -144,7 +145,7 @@
 | Upload | `/upload` | Done — file drop, form, progress bar, redirect |
 | Profile | `/profile` | Done — user info with inline name editing, track grid with privacy badges + filter, shared tracks section with filter |
 
-### Components (23 total)
+### Components (24 total)
 
 | Component | Location | Status |
 |-----------|----------|--------|
@@ -164,7 +165,8 @@
 | AddVersionModal | `src/components/tracks/AddVersionModal.tsx` | Done — file upload + version metadata |
 | ManageCollaboratorsModal | `src/components/tracks/ManageCollaboratorsModal.tsx` | Done — invite by email, list/remove collaborators |
 | CommentForm | `src/components/comments/CommentForm.tsx` | Done — text input, optional timestamp, file attachment, @mention support |
-| CommentItem | `src/components/comments/CommentItem.tsx` | Done — display, edit, delete, reply, timestamp click, attachment download, mention highlighting |
+| CommentItem | `src/components/comments/CommentItem.tsx` | Done — display, edit, delete, reply, timestamp click, inline attachment previews (image thumbnail + lightbox, audio player), download, mention highlighting |
+| ImageLightbox | `src/components/comments/ImageLightbox.tsx` | Done — fullscreen image viewer with download button, ESC/backdrop close |
 | CommentList | `src/components/comments/CommentList.tsx` | Done — renders top-level comments |
 | TimestampMarker | `src/components/comments/TimestampMarker.tsx` | Done — waveform overlay markers |
 | MentionInput | `src/components/comments/MentionInput.tsx` | Done — textarea with @mention autocomplete dropdown |
@@ -186,7 +188,7 @@ All routes wired: `/`, `/login`, `/track/:shareableId`, `/upload`, `/profile`, `
 - **Ownership check**: Compare `viewer._id` with `track.creatorId` (both are `Id<"users">`)
 - **R2 upload flow**: Get presigned PUT URL → XHR upload → save metadata via mutation
 - **R2 playback flow**: Get presigned GET URL (1hr cache) → pass to WaveSurfer
-- **Attachment flow**: Select file → validate → upload to R2 → store r2Key in comment
+- **Attachment flow**: Select file → validate → upload to R2 → store r2Key in comment. Display: images show inline thumbnail (click for fullscreen lightbox), audio plays via `<audio>` element, others show download link
 - **WaveSurfer**: Initialize in useEffect, destroy in cleanup. Never leak instances.
 - **Styling**: Tailwind with `studio.*` custom colors, `.card`/`.input` base classes, dark mode default
 

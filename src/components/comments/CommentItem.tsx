@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useAction } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { toast } from 'sonner';
 import { api } from '../../../convex/_generated/api';
 import { Button } from '@/components/ui/Button';
 import { CommentForm } from './CommentForm';
+import { ImageLightbox } from './ImageLightbox';
+import { useAttachmentUrl } from '@/hooks/useAttachmentUrl';
 import { formatDuration, formatRelativeTime, getAttachmentType } from '@/lib/utils';
 import { Clock, Reply, Trash2, Pencil, ChevronDown, ChevronRight, Download, FileAudio, Image, FileText, File, Loader2 } from 'lucide-react';
 import type { Comment, TrackId, VersionId, UserId } from '@/types';
@@ -38,7 +40,7 @@ export function CommentItem({
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(comment.commentText);
   const [deleting, setDeleting] = useState(false);
-  const [loadingAttachment, setLoadingAttachment] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   const replies = useQuery(
     api.comments.getReplies,
@@ -46,15 +48,18 @@ export function CommentItem({
   );
   const deleteComment = useMutation(api.comments.deleteComment);
   const updateComment = useMutation(api.comments.updateComment);
-  const getAttachmentDownloadUrl = useAction(api.r2.getAttachmentDownloadUrl);
+
+  const hasAttachment = comment.attachmentR2Key && comment.attachmentFileName;
+  const attachmentType = hasAttachment ? getAttachmentType(comment.attachmentFileName!) : 'unknown';
+  const { url: attachmentUrl, loading: attachmentUrlLoading } = useAttachmentUrl(
+    hasAttachment ? comment.attachmentR2Key! : undefined
+  );
+  const AttachmentIcon = hasAttachment
+    ? attachmentTypeIcons[attachmentType]
+    : File;
 
   const canModify = currentUserId === comment.authorId;
   const canDelete = canModify || isTrackOwner;
-
-  const hasAttachment = comment.attachmentR2Key && comment.attachmentFileName;
-  const AttachmentIcon = hasAttachment
-    ? attachmentTypeIcons[getAttachmentType(comment.attachmentFileName!)]
-    : File;
 
   const handleDelete = async () => {
     try {
@@ -89,19 +94,6 @@ export function CommentItem({
       }
       return part;
     });
-  };
-
-  const handleDownloadAttachment = async () => {
-    if (!comment.attachmentR2Key) return;
-    try {
-      setLoadingAttachment(true);
-      const { downloadUrl } = await getAttachmentDownloadUrl({ r2Key: comment.attachmentR2Key });
-      window.open(downloadUrl, '_blank');
-    } catch {
-      toast.error('Failed to download attachment');
-    } finally {
-      setLoadingAttachment(false);
-    }
   };
 
   return (
@@ -147,23 +139,99 @@ export function CommentItem({
         </p>
       )}
 
-      {/* Attachment */}
-      {hasAttachment && (
+      {/* Attachment — Image */}
+      {hasAttachment && attachmentType === 'image' && (
+        <div className="mb-2 max-w-sm">
+          {attachmentUrlLoading ? (
+            <div className="h-48 bg-studio-dark border border-studio-gray rounded-lg animate-pulse" />
+          ) : attachmentUrl ? (
+            <button
+              type="button"
+              onClick={() => setLightboxOpen(true)}
+              className="block rounded-lg overflow-hidden border border-studio-gray hover:border-studio-accent transition-colors"
+            >
+              <img
+                src={attachmentUrl}
+                alt={comment.attachmentFileName}
+                className="max-h-48 object-cover rounded-lg"
+              />
+            </button>
+          ) : null}
+          <div className="flex items-center gap-2 mt-1.5 text-sm">
+            <Image className="w-3.5 h-3.5 text-studio-accent-cyan flex-shrink-0" />
+            <span className="truncate flex-1 text-xs text-studio-text-secondary">
+              {comment.attachmentFileName}
+            </span>
+            {attachmentUrl && (
+              <a
+                href={attachmentUrl}
+                download={comment.attachmentFileName}
+                className="text-studio-text-secondary hover:text-studio-accent flex-shrink-0"
+                title="Download"
+              >
+                <Download className="w-3.5 h-3.5" />
+              </a>
+            )}
+          </div>
+          {lightboxOpen && attachmentUrl && (
+            <ImageLightbox
+              src={attachmentUrl}
+              fileName={comment.attachmentFileName!}
+              onClose={() => setLightboxOpen(false)}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Attachment — Audio */}
+      {hasAttachment && attachmentType === 'audio' && (
+        <div className="mb-2 max-w-sm">
+          {attachmentUrlLoading ? (
+            <div className="h-12 bg-studio-dark border border-studio-gray rounded-lg animate-pulse" />
+          ) : attachmentUrl ? (
+            <audio
+              controls
+              preload="metadata"
+              src={attachmentUrl}
+              className="w-full h-10 rounded-lg"
+            />
+          ) : null}
+          <div className="flex items-center gap-2 mt-1.5 text-sm">
+            <FileAudio className="w-3.5 h-3.5 text-studio-accent-cyan flex-shrink-0" />
+            <span className="truncate flex-1 text-xs text-studio-text-secondary">
+              {comment.attachmentFileName}
+            </span>
+            {attachmentUrl && (
+              <a
+                href={attachmentUrl}
+                download={comment.attachmentFileName}
+                className="text-studio-text-secondary hover:text-studio-accent flex-shrink-0"
+                title="Download"
+              >
+                <Download className="w-3.5 h-3.5" />
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Attachment — Other (PDF, text, unknown) */}
+      {hasAttachment && attachmentType !== 'image' && attachmentType !== 'audio' && (
         <div className="flex items-center gap-2 bg-studio-dark border border-studio-gray rounded-lg px-3 py-2 text-sm mb-2 max-w-sm">
           <AttachmentIcon className="w-4 h-4 text-studio-accent-cyan flex-shrink-0" />
           <span className="truncate flex-1">{comment.attachmentFileName}</span>
-          <button
-            onClick={handleDownloadAttachment}
-            disabled={loadingAttachment}
-            className="text-studio-text-secondary hover:text-studio-accent flex-shrink-0"
-            title="Download attachment"
-          >
-            {loadingAttachment ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
+          {attachmentUrl ? (
+            <a
+              href={attachmentUrl}
+              download={comment.attachmentFileName}
+              className="text-studio-text-secondary hover:text-studio-accent flex-shrink-0"
+              title="Download attachment"
+            >
               <Download className="w-4 h-4" />
-            )}
-          </button>
+            </a>
+          ) : (
+            <Loader2 className="w-4 h-4 animate-spin text-studio-text-secondary flex-shrink-0" />
+          )}
         </div>
       )}
 
