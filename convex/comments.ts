@@ -216,13 +216,9 @@ export const updateComment = mutation({
       throw new Error("Not authorized");
     }
 
-    const patch: { commentText: string; timestamp?: number } = {
+    await ctx.db.patch(args.commentId, {
       commentText: args.commentText,
-    };
-    if (args.timestamp !== undefined) {
-      patch.timestamp = args.timestamp;
-    }
-
-    await ctx.db.patch(args.commentId, patch);
+      ...(args.timestamp !== undefined && { timestamp: args.timestamp }),
+    });
   },
 });
