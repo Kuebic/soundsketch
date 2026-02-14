@@ -13,6 +13,7 @@ import { CommentForm } from '@/components/comments/CommentForm';
 import { CommentList } from '@/components/comments/CommentList';
 import { Button } from '@/components/ui/Button';
 import { PlayerErrorFallback } from '@/components/ui/PlayerErrorFallback';
+import { useAnonymousIdentity } from '@/hooks/useAnonymousIdentity';
 import { formatDuration } from '@/lib/utils';
 import { Loader2, Globe, Lock, Link2, Plus, X, Clock, MessageCircle, Layers } from 'lucide-react';
 import type { VersionId } from '@/types';
@@ -24,6 +25,9 @@ export function TrackPage() {
   const [seekToTime, setSeekToTime] = useState<number | null>(null);
   const [showAddVersion, setShowAddVersion] = useState(false);
   const [showAllVersions, setShowAllVersions] = useState(false);
+
+  // Anonymous identity for non-logged-in users
+  const anonymousIdentity = useAnonymousIdentity();
 
   // Data fetching
   const track = useQuery(api.tracks.getByShareableId, shareableId ? { shareableId } : 'skip');
@@ -214,9 +218,9 @@ export function TrackPage() {
         {!viewer && selectedVersionId && (
           <div className="bg-studio-dark border border-studio-gray rounded-lg px-4 py-3 mb-6 text-sm text-studio-text-secondary">
             <p>
-              You are not signed in. Comments will be posted as <strong className="text-studio-text-primary">Anonymous</strong>.{' '}
+              You are not signed in. Comments will be posted as <strong className="text-studio-text-primary">{anonymousIdentity.name}</strong>.{' '}
               <Link to="/login" className="text-studio-accent hover:underline">Sign in</Link>{' '}
-              to use your name and view your comment history.
+              to use your own name.
             </p>
           </div>
         )}
@@ -232,6 +236,7 @@ export function TrackPage() {
               <CommentList
                 comments={timestampComments}
                 currentUserId={viewer?._id}
+                currentAnonymousId={viewer ? undefined : anonymousIdentity.id}
                 isTrackOwner={isOwner}
                 onTimestampClick={(ts) => setSeekToTime(ts)}
                 versionId={selectedVersionId}
@@ -256,6 +261,7 @@ export function TrackPage() {
               <CommentList
                 comments={generalComments}
                 currentUserId={viewer?._id}
+                currentAnonymousId={viewer ? undefined : anonymousIdentity.id}
                 isTrackOwner={isOwner}
                 versionId={selectedVersionId}
                 trackId={track._id}

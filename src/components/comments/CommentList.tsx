@@ -5,6 +5,7 @@ import type { Comment, TrackId, VersionId, UserId } from '@/types';
 interface CommentListProps {
   comments: Comment[] | undefined;
   currentUserId?: UserId;
+  currentAnonymousId?: string;
   isTrackOwner?: boolean;
   onTimestampClick?: (timestamp: number) => void;
   versionId: VersionId;
@@ -15,6 +16,7 @@ interface CommentListProps {
 export function CommentList({
   comments,
   currentUserId,
+  currentAnonymousId,
   isTrackOwner,
   onTimestampClick,
   versionId,
@@ -44,6 +46,7 @@ export function CommentList({
           key={comment._id}
           comment={comment}
           currentUserId={currentUserId}
+          currentAnonymousId={currentAnonymousId}
           isTrackOwner={isTrackOwner}
           onTimestampClick={onTimestampClick}
           versionId={versionId}

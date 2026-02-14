@@ -16,12 +16,15 @@ export const create = mutation({
     parentCommentId: v.optional(v.id("comments")),
     attachmentR2Key: v.optional(v.string()),
     attachmentFileName: v.optional(v.string()),
+    anonymousId: v.optional(v.string()),
+    anonymousName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Allow guest comments on public/unlisted tracks
     const userId = await getAuthUserId(ctx);
     let authorId: Id<"users"> | undefined;
     let authorName = "Anonymous";
+    let anonymousId: string | undefined;
 
     if (userId) {
       const user = await ctx.db.get(userId);
@@ -29,6 +32,11 @@ export const create = mutation({
         authorId = user._id;
         authorName = user.name ?? "Anonymous";
       }
+      // No anonymousId for authenticated users
+    } else {
+      // Guest: use provided anonymous info
+      anonymousId = args.anonymousId;
+      authorName = args.anonymousName ?? "Anonymous";
     }
 
     // Private tracks require authentication + creator/collaborator access
@@ -66,6 +74,7 @@ export const create = mutation({
       parentCommentId: args.parentCommentId,
       attachmentR2Key: args.attachmentR2Key,
       attachmentFileName: args.attachmentFileName,
+      anonymousId,
     });
 
     return commentId;
@@ -174,18 +183,27 @@ export const getReplies = query({
  * Delete a comment
  */
 export const deleteComment = mutation({
-  args: { commentId: v.id("comments") },
+  args: {
+    commentId: v.id("comments"),
+    anonymousId: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
 
     const comment = await ctx.db.get(args.commentId);
     if (!comment) throw new Error("Comment not found");
 
     // Check if user is comment author or track owner
     const track = await ctx.db.get(comment.trackId);
-    const isAuthor = comment.authorId === userId;
-    const isTrackOwner = track?.creatorId === userId;
+    const isTrackOwner = userId && track?.creatorId === userId;
+
+    // Check authorization
+    let isAuthor = false;
+    if (userId) {
+      isAuthor = comment.authorId === userId;
+    } else if (args.anonymousId && comment.anonymousId) {
+      isAuthor = comment.anonymousId === args.anonymousId;
+    }
 
     if (!isAuthor && !isTrackOwner) {
       throw new Error("Not authorized");
@@ -203,17 +221,24 @@ export const updateComment = mutation({
     commentId: v.id("comments"),
     commentText: v.string(),
     timestamp: v.optional(v.number()),
+    anonymousId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-
     const comment = await ctx.db.get(args.commentId);
     if (!comment) throw new Error("Comment not found");
 
-    // Only comment author can edit
-    if (comment.authorId !== userId) {
-      throw new Error("Not authorized");
+    // Authorization check
+    if (userId) {
+      // Logged in: must be comment author
+      if (comment.authorId !== userId) {
+        throw new Error("Not authorized");
+      }
+    } else {
+      // Guest: must match anonymousId AND comment must have anonymousId
+      if (!comment.anonymousId || comment.anonymousId !== args.anonymousId) {
+        throw new Error("Not authorized");
+      }
     }
 
     await ctx.db.patch(args.commentId, {

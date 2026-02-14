@@ -16,8 +16,10 @@ export default defineSchema({
     isAnonymous: v.optional(v.boolean()),
     // Custom fields
     avatarUrl: v.optional(v.string()),
+    username: v.optional(v.string()), // Unique, alphanumeric, 3-30 chars
   })
-    .index("email", ["email"]),
+    .index("email", ["email"])
+    .index("by_username", ["username"]),
 
   tracks: defineTable({
     title: v.string(),
@@ -64,6 +66,7 @@ export default defineSchema({
     parentCommentId: v.optional(v.id("comments")), // for threading
     attachmentR2Key: v.optional(v.string()),
     attachmentFileName: v.optional(v.string()),
+    anonymousId: v.optional(v.string()), // Browser-generated UUID for guest identity
   })
     .index("by_version", ["versionId"])
     .index("by_track", ["trackId"])

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { toast } from 'sonner';
 import { api } from '../../../convex/_generated/api';
@@ -13,6 +13,7 @@ import type { Comment, TrackId, VersionId, UserId } from '@/types';
 interface CommentItemProps {
   comment: Comment;
   currentUserId?: UserId;
+  currentAnonymousId?: string;
   isTrackOwner?: boolean;
   onTimestampClick?: (timestamp: number) => void;
   versionId: VersionId;
@@ -30,6 +31,7 @@ const attachmentTypeIcons = {
 export function CommentItem({
   comment,
   currentUserId,
+  currentAnonymousId,
   isTrackOwner,
   onTimestampClick,
   versionId,
@@ -60,13 +62,29 @@ export function CommentItem({
     ? attachmentTypeIcons[attachmentType]
     : File;
 
-  const canModify = currentUserId === comment.authorId;
+  // Fix: proper authorization check that handles anonymous users
+  const canModify = useMemo(() => {
+    // Logged in user: must match authorId (both must exist)
+    if (currentUserId && comment.authorId) {
+      return currentUserId === comment.authorId;
+    }
+    // Anonymous user: must have anonymousId AND it must match
+    if (currentAnonymousId && comment.anonymousId) {
+      return currentAnonymousId === comment.anonymousId;
+    }
+    // No match - cannot modify
+    return false;
+  }, [currentUserId, currentAnonymousId, comment.authorId, comment.anonymousId]);
+
   const canDelete = canModify || isTrackOwner;
 
   const handleDelete = async () => {
     try {
       setDeleting(true);
-      await deleteComment({ commentId: comment._id });
+      await deleteComment({
+        commentId: comment._id,
+        anonymousId: currentAnonymousId,
+      });
     } catch {
       toast.error('Failed to delete comment');
       setDeleting(false);
@@ -76,9 +94,15 @@ export function CommentItem({
   const handleSaveEdit = async () => {
     if (!editText.trim()) return;
     try {
-      const args: { commentId: typeof comment._id; commentText: string; timestamp?: number } = {
+      const args: {
+        commentId: typeof comment._id;
+        commentText: string;
+        timestamp?: number;
+        anonymousId?: string;
+      } = {
         commentId: comment._id,
         commentText: editText.trim(),
+        anonymousId: currentAnonymousId,
       };
       if (comment.timestamp !== undefined) {
         args.timestamp = editMinutes * 60 + editSeconds;
@@ -339,6 +363,7 @@ export function CommentItem({
                   key={reply._id}
                   comment={reply}
                   currentUserId={currentUserId}
+                  currentAnonymousId={currentAnonymousId}
                   isTrackOwner={isTrackOwner}
                   onTimestampClick={onTimestampClick}
                   versionId={versionId}

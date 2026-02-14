@@ -39,7 +39,7 @@
 | Comment threading (replies) | Done | `parentCommentId` field, nested rendering in `CommentItem` |
 | Timestamp comments | Done | `CommentForm` with optional timestamp, `TimestampMarker` |
 | Timestamp markers on waveform | Done | `TimestampMarker` overlay, click-to-seek |
-| Edit/delete comments | Done | Author + track-owner moderation in `CommentItem` |
+| Edit/delete comments | Done | Author (authenticated or anonymous) + track-owner moderation in `CommentItem` |
 
 ### Phase 3: Enhanced Features — Complete
 
@@ -74,6 +74,8 @@
 | Optimistic updates (comments) | Done | `commentCreateOptimistic` helper in `src/lib/optimisticUpdates.ts`, wired via `withOptimisticUpdate` in `CommentForm` |
 | Rate limiting (comments) | Done | `convex/lib/rateLimit.ts` helper, 10/min authenticated, 5/min per-track guest. `rateLimits` table in schema |
 | Rate limiting (uploads) | Done | 5 uploads/hour per user via `checkRateLimit` in `convex/versions.ts` |
+| Anonymous user identification | Done | Persistent identity via localStorage (`anonymousId`), funny generated names (adjective-animal), edit/delete authorization |
+| Username-based authentication | Done | Username field in schema, login via username or email, optional email on signup, password confirmation |
 
 ---
 
@@ -81,10 +83,10 @@
 
 ### Schema (`convex/schema.ts`)
 
-- **users** — Convex Auth fields + avatarUrl, tokenIdentifier. Indexes: email, by_token_identifier
+- **users** — Convex Auth fields + avatarUrl, username. Indexes: email, by_username
 - **tracks** — title, description, creatorId, creatorName, visibility ("public" | "unlisted" | "private"), shareableId, latestVersionId. Indexes: by_creator, by_shareable_id, by_visibility. Search indexes: search_title (title, filterFields: visibility), search_creator (creatorName, filterFields: visibility)
 - **versions** — trackId, versionName, changeNotes, r2Key, r2Bucket, fileName, fileSize, fileFormat, duration, uploadedBy. Index: by_track
-- **comments** — versionId, trackId, authorId (optional), authorName, commentText, timestamp (optional), parentCommentId (threading), attachmentR2Key, attachmentFileName. Indexes: by_version, by_track, by_parent, by_timestamp
+- **comments** — versionId, trackId, authorId (optional), authorName, commentText, timestamp (optional), parentCommentId (threading), attachmentR2Key, attachmentFileName, anonymousId (optional). Indexes: by_version, by_track, by_parent, by_timestamp
 - **rateLimits** — key, timestamps (array). Index: by_key. Used for server-side rate limiting
 - **trackAccess** — trackId, userId, grantedBy, grantedAt. Indexes: by_track, by_user, by_track_and_user
 
@@ -97,8 +99,8 @@
 | `convex/comments.ts` | create (guest-friendly, private-track access gated, rate-limited), getByVersion, getTimestampComments (w/ includeAllVersions), getGeneralComments (w/ includeAllVersions), getReplies, deleteComment, updateComment | Done |
 | `convex/migrations.ts` | migrateVisibility (one-time: isPublic → visibility) | Temporary — delete after running |
 | `convex/r2.ts` | getTrackUploadUrl, getTrackDownloadUrl, getAttachmentDownloadUrl, getAttachmentUploadUrl | Done |
-| `convex/users.ts` | viewer (returns `_id` from users table), searchByEmail, getTrackParticipants, updateName (w/ denormalized creatorName propagation) | Done |
-| `convex/auth.ts` | Convex Auth with Password provider, custom profile extracts name on signup | Done |
+| `convex/users.ts` | viewer (returns `_id` from users table), searchByEmail, getTrackParticipants, updateName (w/ denormalized creatorName propagation), checkUsernameAvailable | Done |
+| `convex/auth.ts` | Convex Auth with Password provider, custom profile extracts name + username on signup | Done |
 | `convex/http.ts` | Auth HTTP routes | Done |
 | `convex/lib/r2Client.ts` | S3-compatible R2 client, generateUploadUrl, generateDownloadUrl | Done |
 | `convex/lib/rateLimit.ts` | Reusable `checkRateLimit` helper — sliding window rate limiter backed by `rateLimits` table | Done |
@@ -119,6 +121,7 @@
 | Error boundaries | `react-error-boundary` in `src/App.tsx`, `src/pages/TrackPage.tsx` | Global + player-specific boundaries with themed fallbacks |
 | OG meta tags | `index.html` | Static OG/Twitter Card tags, description, theme-color, placeholder image |
 | Utility functions | `src/lib/utils.ts` | cn, formatDuration, formatFileSize, validateAudioFile, validateAttachmentFile, getAttachmentType, generateShareableLink, formatRelativeTime |
+| Anonymous user utils | `src/lib/anonymousUser.ts` | generateAnonymousName, generateAnonymousId, getAnonymousIdentity (localStorage persistence) |
 | Optimistic updates | `src/lib/optimisticUpdates.ts` | `commentCreateOptimistic` — patches local query cache for instant comment appearance |
 | Type definitions | `src/types/index.ts` | Track, Version, Comment, User type exports |
 
@@ -134,6 +137,7 @@
 | `useAttachmentUrl` | `src/hooks/useAttachmentUrl.ts` | Fetches + caches R2 attachment download URLs (55-min cache) for inline previews |
 | `useKeyboardShortcuts` | `src/hooks/useKeyboardShortcuts.ts` | Spacebar play/pause, arrow key seeking (±5s), input-aware |
 | `useDebounce` | `src/hooks/useDebounce.ts` | Generic debounce hook for search input |
+| `useAnonymousIdentity` | `src/hooks/useAnonymousIdentity.ts` | Persistent anonymous identity (funny names like "sneaky-owl") from localStorage |
 
 ### Pages
 
@@ -155,7 +159,7 @@
 | Modal | `src/components/ui/Modal.tsx` | Done — backdrop blur, ESC close, responsive sizes |
 | ErrorFallback | `src/components/ui/ErrorFallback.tsx` | Done — full-page error boundary fallback |
 | PlayerErrorFallback | `src/components/ui/PlayerErrorFallback.tsx` | Done — inline audio player error fallback |
-| LoginForm | `src/components/auth/LoginForm.tsx` | Done — Convex Auth integration, username field on signup |
+| LoginForm | `src/components/auth/LoginForm.tsx` | Done — Convex Auth integration, username-based signup/login, optional email, password confirmation |
 | TrackPlayer | `src/components/audio/TrackPlayer.tsx` | Done — waveform + timestamp markers + external seek + keyboard shortcuts |
 | PlaybackControls | `src/components/audio/PlaybackControls.tsx` | Done — play/pause, progress, volume, speed |
 | TrackCard | `src/components/tracks/TrackCard.tsx` | Done — reusable card for Home + Profile |
@@ -165,7 +169,7 @@
 | AddVersionModal | `src/components/tracks/AddVersionModal.tsx` | Done — file upload + version metadata |
 | ManageCollaboratorsModal | `src/components/tracks/ManageCollaboratorsModal.tsx` | Done — invite by email, list/remove collaborators |
 | CommentForm | `src/components/comments/CommentForm.tsx` | Done — text input, optional timestamp, file attachment, @mention support |
-| CommentItem | `src/components/comments/CommentItem.tsx` | Done — display, edit, delete, reply, timestamp click, inline attachment previews (image thumbnail + lightbox, audio player), download, mention highlighting |
+| CommentItem | `src/components/comments/CommentItem.tsx` | Done — display, edit, delete, reply, timestamp click, inline attachment previews (image thumbnail + lightbox, audio player), download, mention highlighting, anonymous user edit/delete authorization |
 | ImageLightbox | `src/components/comments/ImageLightbox.tsx` | Done — fullscreen image viewer with download button, ESC/backdrop close |
 | CommentList | `src/components/comments/CommentList.tsx` | Done — renders top-level comments |
 | TimestampMarker | `src/components/comments/TimestampMarker.tsx` | Done — waveform overlay markers |

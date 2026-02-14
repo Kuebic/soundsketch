@@ -114,3 +114,21 @@ export const updateName = mutation({
     }
   },
 });
+
+/**
+ * Check if a username is available.
+ */
+export const checkUsernameAvailable = query({
+  args: { username: v.string() },
+  handler: async (ctx, args) => {
+    const normalized = args.username.toLowerCase().trim();
+    if (!normalized) return false;
+
+    const existing = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", normalized))
+      .first();
+
+    return existing === null;
+  },
+});

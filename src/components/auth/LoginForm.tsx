@@ -9,9 +9,9 @@ function getFriendlyError(err: unknown, isSignUp: boolean): string {
   if (message.includes("Invalid password") || message.includes("InvalidSecret"))
     return "Incorrect password. Please try again.";
   if (message.includes("Could not find user") || message.includes("InvalidAccountId"))
-    return "No account found with that email.";
+    return "No account found with that username or email.";
   if (message.includes("already exists") || message.includes("UniqueError"))
-    return "An account with that email already exists. Try logging in instead.";
+    return "An account with that username or email already exists. Try logging in instead.";
   if (message.includes("rate limit") || message.includes("RateLimited"))
     return "Too many attempts. Please wait a moment and try again.";
   if (message.includes("Server Error") || message.includes("Index") || message.includes("Uncaught"))
@@ -23,30 +23,79 @@ function getFriendlyError(err: unknown, isSignUp: boolean): string {
 }
 
 export function LoginForm() {
-  const [email, setEmail] = useState('');
+  // Sign in fields
+  const [identifier, setIdentifier] = useState(''); // username or email for login
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
+
+  // Sign up fields
+  const [username, setUsername] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { signIn } = useAuthActions();
+
+  const validateUsername = (value: string): string | null => {
+    const trimmed = value.trim();
+    if (trimmed.length < 3) return 'Username must be at least 3 characters';
+    if (trimmed.length > 30) return 'Username must be 30 characters or fewer';
+    if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) return 'Username can only contain letters, numbers, and underscores';
+    return null;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    try {
-      await signIn("password", {
-        email,
-        password,
-        flow: isSignUp ? "signUp" : "signIn",
-        ...(isSignUp && name.trim() ? { name: name.trim() } : {}),
-      });
-    } catch (err) {
-      setError(getFriendlyError(err, isSignUp));
-    } finally {
-      setLoading(false);
+    if (isSignUp) {
+      // Validate username
+      const usernameError = validateUsername(username);
+      if (usernameError) {
+        setError(usernameError);
+        setLoading(false);
+        return;
+      }
+
+      // Validate password confirmation
+      if (password !== confirmPassword) {
+        setError('Passwords do not match');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // If no email provided, generate a placeholder from username
+        // This satisfies the Password provider while making email effectively optional
+        const effectiveEmail = email.trim() || `${username.trim().toLowerCase()}@soundsketch.local`;
+
+        await signIn("password", {
+          email: effectiveEmail,
+          password,
+          flow: "signUp",
+          name: displayName.trim() || username.trim(),
+          username: username.trim().toLowerCase(),
+        });
+      } catch (err) {
+        setError(getFriendlyError(err, true));
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      try {
+        await signIn("password", {
+          email: identifier.trim(), // This is username or email
+          password,
+          flow: "signIn",
+        });
+      } catch (err) {
+        setError(getFriendlyError(err, false));
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -63,48 +112,120 @@ export function LoginForm() {
           </div>
         )}
 
-        {isSignUp && (
-          <div>
-            <label className="block text-sm font-medium mb-2">Username</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your display name"
-              className="input"
-              required
-              disabled={loading}
-              maxLength={50}
-            />
-          </div>
+        {isSignUp ? (
+          <>
+            {/* Username (required for signup) */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Username</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="your_username"
+                className="input"
+                required
+                disabled={loading}
+                minLength={3}
+                maxLength={30}
+              />
+              <p className="text-xs text-studio-text-secondary mt-1">
+                Letters, numbers, and underscores only
+              </p>
+            </div>
+
+            {/* Display Name (optional) */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Display Name <span className="text-studio-text-secondary">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Your display name"
+                className="input"
+                disabled={loading}
+                maxLength={50}
+              />
+            </div>
+
+            {/* Email (optional) */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Email <span className="text-studio-text-secondary">(optional)</span>
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="input"
+                disabled={loading}
+              />
+              <p className="text-xs text-studio-text-secondary mt-1">
+                Only needed for password recovery
+              </p>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="input"
+                required
+                disabled={loading}
+              />
+            </div>
+
+            {/* Confirm Password */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Confirm Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                className="input"
+                required
+                disabled={loading}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Login: Username or Email */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Username or Email</label>
+              <input
+                type="text"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="username or email"
+                className="input"
+                required
+                disabled={loading}
+              />
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="input"
+                required
+                disabled={loading}
+              />
+            </div>
+          </>
         )}
-
-        <div>
-          <label className="block text-sm font-medium mb-2">Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            className="input"
-            required
-            disabled={loading}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-2">Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            className="input"
-            required
-            disabled={loading}
-            minLength={8}
-          />
-        </div>
 
         <Button
           type="submit"
@@ -123,7 +244,10 @@ export function LoginForm() {
 
         <button
           type="button"
-          onClick={() => setIsSignUp(!isSignUp)}
+          onClick={() => {
+            setIsSignUp(!isSignUp);
+            setError(null);
+          }}
           className="w-full text-sm text-studio-text-secondary hover:text-studio-text-primary transition-colors"
           disabled={loading}
         >

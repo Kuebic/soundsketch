@@ -5,6 +5,7 @@ import { api } from '../../../convex/_generated/api';
 import { Button } from '@/components/ui/Button';
 import { MentionInput } from './MentionInput';
 import { useAttachmentUpload } from '@/hooks/useAttachmentUpload';
+import { useAnonymousIdentity } from '@/hooks/useAnonymousIdentity';
 import { commentCreateOptimistic } from '@/lib/optimisticUpdates';
 import { formatDuration, formatFileSize, validateAttachmentFile, getAttachmentType } from '@/lib/utils';
 import { Send, X, Clock, Paperclip, FileAudio, Image, FileText, File, Loader2 } from 'lucide-react';
@@ -43,12 +44,14 @@ export function CommentForm({
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const viewer = useQuery(api.users.viewer);
+  const anonymousIdentity = useAnonymousIdentity();
+  const displayName = viewer?.name ?? anonymousIdentity.name;
   const createComment = useMutation(api.comments.create).withOptimisticUpdate(
     (localStore, args) =>
       commentCreateOptimistic(
         localStore,
         args,
-        viewer?.name ?? 'Anonymous',
+        displayName,
         viewer?._id,
       ),
   );
@@ -103,6 +106,11 @@ export function CommentForm({
         parentCommentId,
         attachmentR2Key,
         attachmentFileName,
+        // Pass anonymous identity if not logged in
+        ...(viewer ? {} : {
+          anonymousId: anonymousIdentity.id,
+          anonymousName: anonymousIdentity.name,
+        }),
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to post comment');
