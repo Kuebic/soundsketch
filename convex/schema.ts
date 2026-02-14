@@ -71,7 +71,8 @@ export default defineSchema({
     .index("by_version", ["versionId"])
     .index("by_track", ["trackId"])
     .index("by_parent", ["parentCommentId"])
-    .index("by_timestamp", ["versionId", "timestamp"]),
+    .index("by_timestamp", ["versionId", "timestamp"])
+    .index("by_anonymous_id", ["anonymousId"]),
 
   rateLimits: defineTable({
     key: v.string(),

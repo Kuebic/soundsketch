@@ -43,6 +43,14 @@ export interface AnonymousIdentity {
 }
 
 /**
+ * Get the existing anonymousId if present, without creating one.
+ * Used for claiming comments on signup/login.
+ */
+export function getExistingAnonymousId(): string | null {
+  return localStorage.getItem(ANONYMOUS_ID_KEY);
+}
+
+/**
  * Get or create anonymous identity from localStorage.
  * Identity persists across browser sessions.
  */

@@ -247,3 +247,53 @@ export const updateComment = mutation({
     });
   },
 });
+
+/**
+ * Claim all anonymous comments for the current authenticated user.
+ * Called after signup/login when user has localStorage anonymousId.
+ */
+export const claimAnonymousComments = mutation({
+  args: {
+    anonymousId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Must be authenticated to claim comments");
+    }
+
+    // Validate UUID format
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(args.anonymousId)) {
+      throw new Error("Invalid anonymousId format");
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+    const authorName = user.name ?? "Anonymous";
+
+    // Find all comments with this anonymousId
+    const comments = await ctx.db
+      .query("comments")
+      .withIndex("by_anonymous_id", (q) => q.eq("anonymousId", args.anonymousId))
+      .collect();
+
+    // Update each unclaimed comment to belong to the authenticated user
+    let claimedCount = 0;
+    for (const comment of comments) {
+      if (!comment.authorId) {
+        await ctx.db.patch(comment._id, {
+          authorId: userId,
+          authorName: authorName,
+          anonymousId: undefined,
+        });
+        claimedCount++;
+      }
+    }
+
+    return { claimedCount };
+  },
+});
