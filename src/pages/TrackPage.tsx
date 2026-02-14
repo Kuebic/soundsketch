@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from 'convex/react';
+import { ErrorBoundary } from 'react-error-boundary';
 import { api } from '../../convex/_generated/api';
 import { Navbar } from '@/components/layout/Navbar';
 import { TrackPlayer } from '@/components/audio/TrackPlayer';
@@ -11,6 +12,7 @@ import { AddVersionModal } from '@/components/tracks/AddVersionModal';
 import { CommentForm } from '@/components/comments/CommentForm';
 import { CommentList } from '@/components/comments/CommentList';
 import { Button } from '@/components/ui/Button';
+import { PlayerErrorFallback } from '@/components/ui/PlayerErrorFallback';
 import { formatDuration } from '@/lib/utils';
 import { Loader2, Globe, Lock, Plus, X, Clock, MessageCircle, Layers } from 'lucide-react';
 import type { VersionId } from '@/types';
@@ -152,13 +154,18 @@ export function TrackPage() {
         {/* Player */}
         {selectedVersion ? (
           <div className="mb-8">
-            <TrackPlayer
-              r2Key={selectedVersion.r2Key}
-              onTimestampClick={(ts) => setTimestampForComment(ts)}
-              timestampComments={playerTimestampComments}
-              seekToTime={seekToTime}
-              onSeekComplete={() => setSeekToTime(null)}
-            />
+            <ErrorBoundary
+              FallbackComponent={PlayerErrorFallback}
+              resetKeys={[selectedVersion.r2Key]}
+            >
+              <TrackPlayer
+                r2Key={selectedVersion.r2Key}
+                onTimestampClick={(ts) => setTimestampForComment(ts)}
+                timestampComments={playerTimestampComments}
+                seekToTime={seekToTime}
+                onSeekComplete={() => setSeekToTime(null)}
+              />
+            </ErrorBoundary>
           </div>
         ) : versions === undefined ? (
           <div className="card flex items-center justify-center py-12 mb-8">

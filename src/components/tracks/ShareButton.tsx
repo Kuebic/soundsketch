@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link2, Check } from 'lucide-react';
+import { toast } from 'sonner';
+import { Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { generateShareableLink } from '@/lib/utils';
 
@@ -8,28 +8,20 @@ interface ShareButtonProps {
 }
 
 export function ShareButton({ shareableId }: ShareButtonProps) {
-  const [copied, setCopied] = useState(false);
-
   const handleCopy = async () => {
-    const link = generateShareableLink(shareableId);
-    await navigator.clipboard.writeText(link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      const link = generateShareableLink(shareableId);
+      await navigator.clipboard.writeText(link);
+      toast.success('Link copied to clipboard');
+    } catch {
+      toast.error('Failed to copy link');
+    }
   };
 
   return (
     <Button variant="secondary" size="sm" onClick={handleCopy}>
-      {copied ? (
-        <>
-          <Check className="w-4 h-4 mr-1" />
-          Copied!
-        </>
-      ) : (
-        <>
-          <Link2 className="w-4 h-4 mr-1" />
-          Share
-        </>
-      )}
+      <Link2 className="w-4 h-4 mr-1" />
+      Share
     </Button>
   );
 }

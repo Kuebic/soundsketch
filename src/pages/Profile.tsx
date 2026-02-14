@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'sonner';
 import { api } from '../../convex/_generated/api';
 import { Navbar } from '@/components/layout/Navbar';
 import { TrackCard } from '@/components/tracks/TrackCard';
@@ -17,36 +18,33 @@ export function Profile() {
   const [editing, setEditing] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const handleStartEdit = () => {
     setNameInput(viewer?.name || '');
     setEditing(true);
-    setError(null);
   };
 
   const handleCancel = () => {
     setEditing(false);
-    setError(null);
   };
 
   const handleSave = async () => {
     const trimmed = nameInput.trim();
     if (!trimmed) {
-      setError('Name cannot be empty');
+      toast.error('Name cannot be empty');
       return;
     }
     if (trimmed.length > 50) {
-      setError('Name must be 50 characters or fewer');
+      toast.error('Name must be 50 characters or fewer');
       return;
     }
     try {
       setSaving(true);
       await updateName({ name: trimmed });
       setEditing(false);
-      setError(null);
+      toast.success('Name updated');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update name');
+      toast.error(err instanceof Error ? err.message : 'Failed to update name');
     } finally {
       setSaving(false);
     }
@@ -94,9 +92,6 @@ export function Profile() {
                   }}
                 />
               </div>
-              {error && (
-                <p className="text-sm text-red-400">{error}</p>
-              )}
               <div className="flex gap-2">
                 <Button size="sm" onClick={() => void handleSave()} disabled={saving || !nameInput.trim()}>
                   {saving ? 'Saving...' : 'Save'}

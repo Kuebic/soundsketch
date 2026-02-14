@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useMutation, useQuery } from 'convex/react';
+import { toast } from 'sonner';
 import { api } from '../../../convex/_generated/api';
 import { Button } from '@/components/ui/Button';
 import { MentionInput } from './MentionInput';
@@ -91,7 +92,7 @@ export function CommentForm({
       setAttachmentFile(null);
       onSubmit?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to post comment');
+      toast.error(err instanceof Error ? err.message : 'Failed to post comment');
     } finally {
       setSubmitting(false);
     }

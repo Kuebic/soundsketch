@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { api } from '../../convex/_generated/api';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { Navbar } from '@/components/layout/Navbar';
@@ -19,7 +20,6 @@ export function Upload() {
   const [description, setDescription] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [versionName, setVersionName] = useState('v1');
-  const [error, setError] = useState<string | null>(null);
 
   // Auth guard
   if (viewer === undefined) {
@@ -43,8 +43,6 @@ export function Upload() {
     if (!file || !title.trim()) return;
 
     try {
-      setError(null);
-
       // Step 1: Create the track
       const { shareableId, trackId } = await createTrack({
         title: title.trim(),
@@ -58,7 +56,7 @@ export function Upload() {
       // Step 3: Navigate to the new track
       navigate(`/track/${shareableId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
+      toast.error(err instanceof Error ? err.message : 'Upload failed');
     }
   };
 
@@ -159,8 +157,8 @@ export function Upload() {
           )}
 
           {/* Errors */}
-          {(error || uploadError) && (
-            <p className="text-sm text-red-400">{error || uploadError}</p>
+          {uploadError && (
+            <p className="text-sm text-red-400">{uploadError}</p>
           )}
 
           {/* Submit */}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation } from 'convex/react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { api } from '../../../convex/_generated/api';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -23,16 +24,23 @@ export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
   const deleteTrack = useMutation(api.tracks.deleteTrack);
 
   const handlePrivacyToggle = async () => {
-    await updatePrivacy({ trackId: track._id, isPublic: !track.isPublic });
-    setOpen(false);
+    try {
+      await updatePrivacy({ trackId: track._id, isPublic: !track.isPublic });
+      toast.success(track.isPublic ? 'Track set to private' : 'Track set to public');
+      setOpen(false);
+    } catch {
+      toast.error('Failed to update privacy');
+    }
   };
 
   const handleDelete = async () => {
     try {
       setDeleting(true);
       await deleteTrack({ trackId: track._id });
+      toast.success('Track deleted');
       navigate('/');
     } catch {
+      toast.error('Failed to delete track');
       setDeleting(false);
     }
   };

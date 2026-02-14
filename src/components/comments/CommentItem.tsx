@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useAction } from 'convex/react';
+import { toast } from 'sonner';
 import { api } from '../../../convex/_generated/api';
 import { Button } from '@/components/ui/Button';
 import { CommentForm } from './CommentForm';
@@ -60,6 +61,7 @@ export function CommentItem({
       setDeleting(true);
       await deleteComment({ commentId: comment._id });
     } catch {
+      toast.error('Failed to delete comment');
       setDeleting(false);
     }
   };
@@ -70,7 +72,7 @@ export function CommentItem({
       await updateComment({ commentId: comment._id, commentText: editText.trim() });
       setEditing(false);
     } catch {
-      // keep editing mode on failure
+      toast.error('Failed to update comment');
     }
   };
 
@@ -96,7 +98,7 @@ export function CommentItem({
       const { downloadUrl } = await getAttachmentDownloadUrl({ r2Key: comment.attachmentR2Key });
       window.open(downloadUrl, '_blank');
     } catch {
-      // silently fail
+      toast.error('Failed to download attachment');
     } finally {
       setLoadingAttachment(false);
     }

@@ -1,6 +1,7 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import { useWaveform } from '@/hooks/useWaveform';
 import { usePresignedUrl } from '@/hooks/usePresignedUrl';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { PlaybackControls } from './PlaybackControls';
 import { TimestampMarker } from '@/components/comments/TimestampMarker';
 import { Loader2 } from 'lucide-react';
@@ -43,6 +44,27 @@ export function TrackPlayer({
     containerRef,
     onReady: () => console.log('Waveform ready'),
     onTimeUpdate: () => {},
+  });
+
+  // Keyboard shortcuts
+  const seekForward = useCallback(() => {
+    if (duration > 0) {
+      const newTime = Math.min(currentTime + 5, duration);
+      seekTo(newTime / duration);
+    }
+  }, [currentTime, duration, seekTo]);
+
+  const seekBackward = useCallback(() => {
+    if (duration > 0) {
+      const newTime = Math.max(currentTime - 5, 0);
+      seekTo(newTime / duration);
+    }
+  }, [currentTime, duration, seekTo]);
+
+  useKeyboardShortcuts({
+    onPlayPause: playPause,
+    onSeekForward: seekForward,
+    onSeekBackward: seekBackward,
   });
 
   // Handle external seek requests

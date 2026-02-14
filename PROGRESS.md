@@ -53,7 +53,7 @@
 | Comment attachments | Done | `useAttachmentUpload` hook, `CommentForm` file picker, `CommentItem` download |
 | Show comments across versions | Done | `includeAllVersions` param in queries, toggle in `TrackPage` |
 | Responsive design | Done | Tailwind responsive classes throughout |
-| Loading states + error handling | Done | Conditional rendering across pages |
+| Loading states + error handling | Done | Conditional rendering, error boundaries, toast notifications |
 | Dark mode theming | Done | `studio.*` color palette, Space Mono + Inter fonts |
 
 ### Phase 4: Collaboration Features — Partially Complete
@@ -103,6 +103,9 @@
 | Tailwind CSS with custom theme | `tailwind.config.js`, `src/styles/globals.css` | `studio.*` color palette, Space Mono + Inter fonts |
 | Convex client setup | `src/lib/convex.ts` | ConvexReactClient singleton |
 | ConvexAuthProvider | `src/main.tsx` | Wraps entire app |
+| Toast notifications | `sonner` in `src/App.tsx` | Dark-themed toaster, bottom-right, used across all mutation/action feedback |
+| Error boundaries | `react-error-boundary` in `src/App.tsx`, `src/pages/TrackPage.tsx` | Global + player-specific boundaries with themed fallbacks |
+| OG meta tags | `index.html` | Static OG/Twitter Card tags, description, theme-color, placeholder image |
 | Utility functions | `src/lib/utils.ts` | cn, formatDuration, formatFileSize, validateAudioFile, validateAttachmentFile, getAttachmentType, generateShareableLink, formatRelativeTime |
 | Type definitions | `src/types/index.ts` | Track, Version, Comment, User type exports |
 
@@ -115,6 +118,7 @@
 | `useFileUpload` | `src/hooks/useFileUpload.ts` | Full upload pipeline: validate → presigned URL → XHR to R2 → save metadata |
 | `useAudioDuration` | `src/hooks/useAudioDuration.ts` | Extract duration from audio File via HTML5 Audio API |
 | `useAttachmentUpload` | `src/hooks/useAttachmentUpload.ts` | Attachment upload: validate → presigned URL → XHR to R2 with progress |
+| `useKeyboardShortcuts` | `src/hooks/useKeyboardShortcuts.ts` | Spacebar play/pause, arrow key seeking (±5s), input-aware |
 
 ### Pages
 
@@ -126,19 +130,21 @@
 | Upload | `/upload` | Done — file drop, form, progress bar, redirect |
 | Profile | `/profile` | Done — user info with inline name editing, track grid with privacy badges, shared tracks section |
 
-### Components (19 total)
+### Components (21 total)
 
 | Component | Location | Status |
 |-----------|----------|--------|
 | Navbar | `src/components/layout/Navbar.tsx` | Done — logo, auth-conditional buttons |
 | Button | `src/components/ui/Button.tsx` | Done — primary/secondary/danger, sm/md/lg |
 | Modal | `src/components/ui/Modal.tsx` | Done — backdrop blur, ESC close, responsive sizes |
+| ErrorFallback | `src/components/ui/ErrorFallback.tsx` | Done — full-page error boundary fallback |
+| PlayerErrorFallback | `src/components/ui/PlayerErrorFallback.tsx` | Done — inline audio player error fallback |
 | LoginForm | `src/components/auth/LoginForm.tsx` | Done — Convex Auth integration, username field on signup |
-| TrackPlayer | `src/components/audio/TrackPlayer.tsx` | Done — waveform + timestamp markers + external seek |
+| TrackPlayer | `src/components/audio/TrackPlayer.tsx` | Done — waveform + timestamp markers + external seek + keyboard shortcuts |
 | PlaybackControls | `src/components/audio/PlaybackControls.tsx` | Done — play/pause, progress, volume, speed |
 | TrackCard | `src/components/tracks/TrackCard.tsx` | Done — reusable card for Home + Profile |
 | VersionSelector | `src/components/tracks/VersionSelector.tsx` | Done — dropdown with version names + dates |
-| ShareButton | `src/components/tracks/ShareButton.tsx` | Done — copies link to clipboard |
+| ShareButton | `src/components/tracks/ShareButton.tsx` | Done — copies link to clipboard with toast |
 | TrackSettingsDropdown | `src/components/tracks/TrackSettingsDropdown.tsx` | Done — privacy toggle, delete, manage collaborators |
 | AddVersionModal | `src/components/tracks/AddVersionModal.tsx` | Done — file upload + version metadata |
 | ManageCollaboratorsModal | `src/components/tracks/ManageCollaboratorsModal.tsx` | Done — invite by email, list/remove collaborators |
@@ -151,7 +157,7 @@
 
 ### Routing (`src/App.tsx`)
 
-All routes wired: `/`, `/login`, `/track/:shareableId`, `/upload`, `/profile`, `*` (404).
+All routes wired: `/`, `/login`, `/track/:shareableId`, `/upload`, `/profile`, `*` (404). Wrapped in global `ErrorBoundary`. `Toaster` at root level.
 
 ---
 

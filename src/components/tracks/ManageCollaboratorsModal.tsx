@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from 'convex/react';
+import { toast } from 'sonner';
 import { api } from '../../../convex/_generated/api';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -17,8 +18,6 @@ export function ManageCollaboratorsModal({ isOpen, onClose, trackId }: ManageCol
   const [searchEmail, setSearchEmail] = useState('');
   const [searchSubmitted, setSearchSubmitted] = useState('');
   const [granting, setGranting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   const collaborators = useQuery(api.tracks.getCollaborators, { trackId });
   const foundUser = useQuery(
@@ -31,8 +30,6 @@ export function ManageCollaboratorsModal({ isOpen, onClose, trackId }: ManageCol
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchEmail.trim()) return;
-    setError(null);
-    setSuccess(null);
     setSearchSubmitted(searchEmail.trim());
   };
 
@@ -40,13 +37,12 @@ export function ManageCollaboratorsModal({ isOpen, onClose, trackId }: ManageCol
     if (!foundUser) return;
     try {
       setGranting(true);
-      setError(null);
       await grantAccess({ trackId, userId: foundUser._id });
-      setSuccess(`Access granted to ${foundUser.name}`);
+      toast.success(`Access granted to ${foundUser.name}`);
       setSearchEmail('');
       setSearchSubmitted('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to grant access');
+      toast.error(err instanceof Error ? err.message : 'Failed to grant access');
     } finally {
       setGranting(false);
     }
@@ -54,10 +50,10 @@ export function ManageCollaboratorsModal({ isOpen, onClose, trackId }: ManageCol
 
   const handleRevoke = async (userId: typeof foundUser extends null ? never : NonNullable<typeof foundUser>['_id']) => {
     try {
-      setError(null);
       await revokeAccess({ trackId, userId });
+      toast.success('Access revoked');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to revoke access');
+      toast.error(err instanceof Error ? err.message : 'Failed to revoke access');
     }
   };
 
@@ -76,10 +72,7 @@ export function ManageCollaboratorsModal({ isOpen, onClose, trackId }: ManageCol
               <input
                 type="email"
                 value={searchEmail}
-                onChange={(e) => {
-                  setSearchEmail(e.target.value);
-                  setSuccess(null);
-                }}
+                onChange={(e) => setSearchEmail(e.target.value)}
                 placeholder="collaborator@email.com"
                 className="input w-full pl-10"
               />
@@ -122,9 +115,6 @@ export function ManageCollaboratorsModal({ isOpen, onClose, trackId }: ManageCol
             </div>
           )}
         </form>
-
-        {error && <p className="text-sm text-red-400">{error}</p>}
-        {success && <p className="text-sm text-green-400">{success}</p>}
 
         {/* Collaborator list */}
         <div>

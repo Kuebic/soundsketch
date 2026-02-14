@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { Modal } from '@/components/ui/Modal';
 import { FileDropZone } from '@/components/upload/FileDropZone';
 import { Button } from '@/components/ui/Button';
@@ -27,9 +28,10 @@ export function AddVersionModal({ isOpen, onClose, trackId }: AddVersionModalPro
       setFile(null);
       setVersionName('');
       setChangeNotes('');
+      toast.success('Version uploaded');
       onClose();
-    } catch {
-      // error is shown from useFileUpload
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Upload failed');
     }
   };
 
