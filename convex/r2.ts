@@ -1,9 +1,19 @@
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { generateUploadUrl, generateDownloadUrl } from "./lib/r2Client";
-import { nanoid } from "nanoid";
 
 const BUCKET_NAME = process.env.R2_BUCKET_NAME || "soundsketch-files";
+
+/** Generate a unique ID safe for the Convex runtime (no ESM-only deps). */
+function generateUniqueId(length = 21): string {
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  let id = "";
+  for (let i = 0; i < length; i++) {
+    id += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return id;
+}
 
 /**
  * Generate presigned URL for uploading a track file to R2
@@ -17,7 +27,7 @@ export const getTrackUploadUrl = action({
   },
   handler: async (_ctx, args): Promise<{ uploadUrl: string; r2Key: string }> => {
     // Generate unique R2 key to prevent collisions
-    const uniqueId = nanoid();
+    const uniqueId = generateUniqueId();
     const extension = args.fileName.split('.').pop();
     const r2Key = `tracks/${args.trackId || uniqueId}/${uniqueId}.${extension}`;
 
@@ -63,7 +73,7 @@ export const getAttachmentUploadUrl = action({
     commentId: v.string(), // will become ID after comment creation
   },
   handler: async (_ctx, args): Promise<{ uploadUrl: string; r2Key: string }> => {
-    const uniqueId = nanoid();
+    const uniqueId = generateUniqueId();
     const extension = args.fileName.split('.').pop();
     const r2Key = `attachments/${args.commentId}/${uniqueId}.${extension}`;
 
