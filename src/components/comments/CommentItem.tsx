@@ -37,6 +37,7 @@ export function CommentItem({
   versionId,
   trackId,
 }: CommentItemProps) {
+  const [collapsed, setCollapsed] = useState(false);
   const [showReplies, setShowReplies] = useState(false);
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -46,6 +47,11 @@ export function CommentItem({
   const [deleting, setDeleting] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
+  // Only fetch reply count for top-level comments
+  const replyCount = useQuery(
+    api.comments.getReplyCount,
+    !comment.parentCommentId ? { parentCommentId: comment._id } : 'skip'
+  );
   const replies = useQuery(
     api.comments.getReplies,
     showReplies ? { parentCommentId: comment._id } : 'skip'
@@ -133,6 +139,13 @@ export function CommentItem({
     <div className="border-l-2 border-studio-gray pl-4 py-2">
       {/* Header */}
       <div className="flex items-center gap-2 mb-1">
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="text-studio-text-secondary hover:text-studio-text-primary"
+          aria-label={collapsed ? 'Expand comment' : 'Collapse comment'}
+        >
+          {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+        </button>
         <span className="text-sm font-medium">{comment.authorName}</span>
         <span className="text-xs text-studio-text-secondary">
           {formatRelativeTime(comment._creationTime)}
@@ -148,6 +161,8 @@ export function CommentItem({
         )}
       </div>
 
+      {!collapsed && (
+        <>
       {/* Body */}
       {editing ? (
         <div className="space-y-2 mb-2">
@@ -346,14 +361,14 @@ export function CommentItem({
       )}
 
       {/* Replies */}
-      {!comment.parentCommentId && (
+      {!comment.parentCommentId && replyCount !== undefined && replyCount > 0 && (
         <div className="mt-2">
           <button
             onClick={() => setShowReplies(!showReplies)}
             className="flex items-center gap-1 text-xs text-studio-text-secondary hover:text-studio-text-primary"
           >
             {showReplies ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-            {showReplies ? 'Hide replies' : 'Show replies'}
+            {showReplies ? 'Hide replies' : `Show replies (${replyCount})`}
           </button>
 
           {showReplies && replies && replies.length > 0 && (
@@ -373,6 +388,8 @@ export function CommentItem({
             </div>
           )}
         </div>
+      )}
+        </>
       )}
     </div>
   );

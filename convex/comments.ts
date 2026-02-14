@@ -180,6 +180,20 @@ export const getReplies = query({
 });
 
 /**
+ * Get the count of replies to a comment
+ */
+export const getReplyCount = query({
+  args: { parentCommentId: v.id("comments") },
+  handler: async (ctx, args) => {
+    const replies = await ctx.db
+      .query("comments")
+      .withIndex("by_parent", (q) => q.eq("parentCommentId", args.parentCommentId))
+      .collect();
+    return replies.length;
+  },
+});
+
+/**
  * Delete a comment
  */
 export const deleteComment = mutation({
