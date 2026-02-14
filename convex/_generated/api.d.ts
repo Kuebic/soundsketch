@@ -12,6 +12,7 @@ import type * as auth from "../auth.js";
 import type * as comments from "../comments.js";
 import type * as http from "../http.js";
 import type * as lib_r2Client from "../lib/r2Client.js";
+import type * as lib_rateLimit from "../lib/rateLimit.js";
 import type * as migrations from "../migrations.js";
 import type * as r2 from "../r2.js";
 import type * as tracks from "../tracks.js";
@@ -29,6 +30,7 @@ declare const fullApi: ApiFromModules<{
   comments: typeof comments;
   http: typeof http;
   "lib/r2Client": typeof lib_r2Client;
+  "lib/rateLimit": typeof lib_rateLimit;
   migrations: typeof migrations;
   r2: typeof r2;
   tracks: typeof tracks;

@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { checkRateLimit } from "./lib/rateLimit";
 
 /**
  * Create a new version for a track
@@ -26,6 +27,9 @@ export const create = mutation({
     if (track.creatorId !== userId) {
       throw new Error("Not authorized");
     }
+
+    // Rate limit: 5 uploads per hour
+    await checkRateLimit(ctx, `upload:${userId}`, 5, 3_600_000);
 
     const versionId = await ctx.db.insert("versions", {
       trackId: args.trackId,

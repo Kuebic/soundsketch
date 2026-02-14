@@ -2,6 +2,7 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { checkRateLimit } from "./lib/rateLimit";
 
 /**
  * Create a new comment (timestamp or general)
@@ -46,6 +47,13 @@ export const create = mutation({
       if (!isCreator && !hasAccess) {
         throw new Error("Not authorized to comment on this track");
       }
+    }
+
+    // Rate limit: 10/min for authenticated users, 5/min per track for guests
+    if (userId) {
+      await checkRateLimit(ctx, `comment:${userId}`, 10, 60_000);
+    } else {
+      await checkRateLimit(ctx, `comment:guest:${args.trackId}`, 5, 60_000);
     }
 
     const commentId = await ctx.db.insert("comments", {

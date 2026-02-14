@@ -67,6 +67,14 @@
 | Email notifications | Not started | Requires external email service (e.g., Resend) |
 | Collaborator roles (viewer/commenter/editor) | Not started | PRD future phase |
 
+### Security & UX Enhancements
+
+| Requirement | Status | Implementation |
+|-------------|--------|----------------|
+| Optimistic updates (comments) | Done | `commentCreateOptimistic` helper in `src/lib/optimisticUpdates.ts`, wired via `withOptimisticUpdate` in `CommentForm` |
+| Rate limiting (comments) | Done | `convex/lib/rateLimit.ts` helper, 10/min authenticated, 5/min per-track guest. `rateLimits` table in schema |
+| Rate limiting (uploads) | Done | 5 uploads/hour per user via `checkRateLimit` in `convex/versions.ts` |
+
 ---
 
 ## Backend (Convex) — Complete
@@ -77,6 +85,7 @@
 - **tracks** — title, description, creatorId, creatorName, visibility ("public" | "unlisted" | "private"), shareableId, latestVersionId. Indexes: by_creator, by_shareable_id, by_visibility. Search indexes: search_title (title, filterFields: visibility), search_creator (creatorName, filterFields: visibility)
 - **versions** — trackId, versionName, changeNotes, r2Key, r2Bucket, fileName, fileSize, fileFormat, duration, uploadedBy. Index: by_track
 - **comments** — versionId, trackId, authorId (optional), authorName, commentText, timestamp (optional), parentCommentId (threading), attachmentR2Key, attachmentFileName. Indexes: by_version, by_track, by_parent, by_timestamp
+- **rateLimits** — key, timestamps (array). Index: by_key. Used for server-side rate limiting
 - **trackAccess** — trackId, userId, grantedBy, grantedAt. Indexes: by_track, by_user, by_track_and_user
 
 ### Convex Functions
@@ -84,14 +93,15 @@
 | File | Functions | Status |
 |------|-----------|--------|
 | `convex/tracks.ts` | create, getPublicTracks, searchPublicTracks, getByShareableId (w/ access control), getMyTracks, updateVisibility, deleteTrack, grantAccess, revokeAccess, getCollaborators, getSharedWithMe | Done |
-| `convex/versions.ts` | create, getByTrack, getById, deleteVersion (w/ fallback) | Done |
-| `convex/comments.ts` | create (guest-friendly, private-track access gated), getByVersion, getTimestampComments (w/ includeAllVersions), getGeneralComments (w/ includeAllVersions), getReplies, deleteComment, updateComment | Done |
+| `convex/versions.ts` | create (rate-limited), getByTrack, getById, deleteVersion (w/ fallback) | Done |
+| `convex/comments.ts` | create (guest-friendly, private-track access gated, rate-limited), getByVersion, getTimestampComments (w/ includeAllVersions), getGeneralComments (w/ includeAllVersions), getReplies, deleteComment, updateComment | Done |
 | `convex/migrations.ts` | migrateVisibility (one-time: isPublic → visibility) | Temporary — delete after running |
 | `convex/r2.ts` | getTrackUploadUrl, getTrackDownloadUrl, getAttachmentDownloadUrl, getAttachmentUploadUrl | Done |
 | `convex/users.ts` | viewer (returns `_id` from users table), searchByEmail, getTrackParticipants, updateName (w/ denormalized creatorName propagation) | Done |
 | `convex/auth.ts` | Convex Auth with Password provider, custom profile extracts name on signup | Done |
 | `convex/http.ts` | Auth HTTP routes | Done |
 | `convex/lib/r2Client.ts` | S3-compatible R2 client, generateUploadUrl, generateDownloadUrl | Done |
+| `convex/lib/rateLimit.ts` | Reusable `checkRateLimit` helper — sliding window rate limiter backed by `rateLimits` table | Done |
 
 ---
 
@@ -109,6 +119,7 @@
 | Error boundaries | `react-error-boundary` in `src/App.tsx`, `src/pages/TrackPage.tsx` | Global + player-specific boundaries with themed fallbacks |
 | OG meta tags | `index.html` | Static OG/Twitter Card tags, description, theme-color, placeholder image |
 | Utility functions | `src/lib/utils.ts` | cn, formatDuration, formatFileSize, validateAudioFile, validateAttachmentFile, getAttachmentType, generateShareableLink, formatRelativeTime |
+| Optimistic updates | `src/lib/optimisticUpdates.ts` | `commentCreateOptimistic` — patches local query cache for instant comment appearance |
 | Type definitions | `src/types/index.ts` | Track, Version, Comment, User type exports |
 
 ### Hooks
@@ -169,7 +180,7 @@ All routes wired: `/`, `/login`, `/track/:shareableId`, `/upload`, `/profile`, `
 ## Key Patterns
 
 - **Convex queries**: `useQuery(api.xxx, args)` — pass `"skip"` to defer until dependencies load
-- **Convex mutations**: `useMutation(api.xxx)` returns async function
+- **Convex mutations**: `useMutation(api.xxx)` returns async function. Comment creation uses `.withOptimisticUpdate()` for instant UI feedback
 - **Convex actions**: `useAction(api.xxx)` for R2 presigned URLs (server-side, non-reactive)
 - **Auth check**: `useQuery(api.users.viewer)` — null if not logged in, undefined while loading
 - **Ownership check**: Compare `viewer._id` with `track.creatorId` (both are `Id<"users">`)

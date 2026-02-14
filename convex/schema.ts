@@ -70,6 +70,12 @@ export default defineSchema({
     .index("by_parent", ["parentCommentId"])
     .index("by_timestamp", ["versionId", "timestamp"]),
 
+  rateLimits: defineTable({
+    key: v.string(),
+    timestamps: v.array(v.number()),
+  })
+    .index("by_key", ["key"]),
+
   trackAccess: defineTable({
     trackId: v.id("tracks"),
     userId: v.id("users"),

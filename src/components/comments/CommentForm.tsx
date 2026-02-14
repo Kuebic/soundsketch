@@ -5,6 +5,7 @@ import { api } from '../../../convex/_generated/api';
 import { Button } from '@/components/ui/Button';
 import { MentionInput } from './MentionInput';
 import { useAttachmentUpload } from '@/hooks/useAttachmentUpload';
+import { commentCreateOptimistic } from '@/lib/optimisticUpdates';
 import { formatDuration, formatFileSize, validateAttachmentFile, getAttachmentType } from '@/lib/utils';
 import { Send, X, Clock, Paperclip, FileAudio, Image, FileText, File, Loader2 } from 'lucide-react';
 import type { TrackId, VersionId, CommentId } from '@/types';
@@ -41,7 +42,16 @@ export function CommentForm({
   const [error, setError] = useState<string | null>(null);
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const createComment = useMutation(api.comments.create);
+  const viewer = useQuery(api.users.viewer);
+  const createComment = useMutation(api.comments.create).withOptimisticUpdate(
+    (localStore, args) =>
+      commentCreateOptimistic(
+        localStore,
+        args,
+        viewer?.name ?? 'Anonymous',
+        viewer?._id,
+      ),
+  );
   const participants = useQuery(api.users.getTrackParticipants, { trackId });
   const { uploadAttachment, uploading, progress, error: uploadError } = useAttachmentUpload();
 
@@ -78,19 +88,22 @@ export function CommentForm({
         attachmentFileName = result.fileName;
       }
 
+      const commentText = text.trim();
+
+      // Clear form immediately for optimistic feel
+      setText('');
+      setAttachmentFile(null);
+      onSubmit?.();
+
       await createComment({
         versionId,
         trackId,
-        commentText: text.trim(),
+        commentText,
         timestamp,
         parentCommentId,
         attachmentR2Key,
         attachmentFileName,
       });
-
-      setText('');
-      setAttachmentFile(null);
-      onSubmit?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to post comment');
     } finally {
