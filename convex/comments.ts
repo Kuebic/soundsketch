@@ -202,6 +202,7 @@ export const updateComment = mutation({
   args: {
     commentId: v.id("comments"),
     commentText: v.string(),
+    timestamp: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -215,8 +216,13 @@ export const updateComment = mutation({
       throw new Error("Not authorized");
     }
 
-    await ctx.db.patch(args.commentId, {
+    const patch: { commentText: string; timestamp?: number } = {
       commentText: args.commentText,
-    });
+    };
+    if (args.timestamp !== undefined) {
+      patch.timestamp = args.timestamp;
+    }
+
+    await ctx.db.patch(args.commentId, patch);
   },
 });

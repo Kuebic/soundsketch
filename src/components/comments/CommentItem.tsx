@@ -39,6 +39,8 @@ export function CommentItem({
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(comment.commentText);
+  const [editMinutes, setEditMinutes] = useState(() => Math.floor((comment.timestamp ?? 0) / 60));
+  const [editSeconds, setEditSeconds] = useState(() => Math.floor((comment.timestamp ?? 0) % 60));
   const [deleting, setDeleting] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
@@ -74,7 +76,14 @@ export function CommentItem({
   const handleSaveEdit = async () => {
     if (!editText.trim()) return;
     try {
-      await updateComment({ commentId: comment._id, commentText: editText.trim() });
+      const args: { commentId: typeof comment._id; commentText: string; timestamp?: number } = {
+        commentId: comment._id,
+        commentText: editText.trim(),
+      };
+      if (comment.timestamp !== undefined) {
+        args.timestamp = editMinutes * 60 + editSeconds;
+      }
+      await updateComment(args);
       setEditing(false);
     } catch {
       toast.error('Failed to update comment');
@@ -118,6 +127,29 @@ export function CommentItem({
       {/* Body */}
       {editing ? (
         <div className="space-y-2 mb-2">
+          {comment.timestamp !== undefined && (
+            <div className="flex items-center gap-1.5 text-xs text-studio-text-secondary">
+              <Clock className="w-3 h-3 text-studio-accent-cyan" />
+              <input
+                type="number"
+                min={0}
+                value={editMinutes}
+                onChange={(e) => setEditMinutes(Math.max(0, parseInt(e.target.value) || 0))}
+                className="input w-12 text-center text-xs px-1 py-0.5"
+                aria-label="Minutes"
+              />
+              <span className="font-mono">:</span>
+              <input
+                type="number"
+                min={0}
+                max={59}
+                value={editSeconds.toString().padStart(2, '0')}
+                onChange={(e) => setEditSeconds(Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
+                className="input w-12 text-center text-xs px-1 py-0.5"
+                aria-label="Seconds"
+              />
+            </div>
+          )}
           <textarea
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
@@ -128,7 +160,12 @@ export function CommentItem({
             <Button size="sm" variant="primary" onClick={handleSaveEdit} disabled={!editText.trim()}>
               Save
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => { setEditing(false); setEditText(comment.commentText); }}>
+            <Button size="sm" variant="secondary" onClick={() => {
+              setEditing(false);
+              setEditText(comment.commentText);
+              setEditMinutes(Math.floor((comment.timestamp ?? 0) / 60));
+              setEditSeconds(Math.floor((comment.timestamp ?? 0) % 60));
+            }}>
               Cancel
             </Button>
           </div>

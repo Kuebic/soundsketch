@@ -6,7 +6,8 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
  * R2 is S3-compatible, so we use the AWS S3 SDK
  */
 export function getR2Client() {
-  const endpoint = process.env.R2_ENDPOINT;
+  const accountId = process.env.R2_ACCOUNT_ID;
+  const endpoint = process.env.R2_ENDPOINT || (accountId ? `https://${accountId}.r2.cloudflarestorage.com` : undefined);
   const accessKeyId = process.env.R2_ACCESS_KEY_ID;
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
 
