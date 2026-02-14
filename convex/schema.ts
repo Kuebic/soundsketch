@@ -67,6 +67,7 @@ export default defineSchema({
     attachmentR2Key: v.optional(v.string()),
     attachmentFileName: v.optional(v.string()),
     anonymousId: v.optional(v.string()), // Browser-generated UUID for guest identity
+    claimedByUser: v.optional(v.boolean()), // true = claimed, false = permanently declined
   })
     .index("by_version", ["versionId"])
     .index("by_track", ["trackId"])

@@ -263,12 +263,61 @@ export const updateComment = mutation({
 });
 
 /**
- * Claim all anonymous comments for the current authenticated user.
- * Called after signup/login when user has localStorage anonymousId.
+ * Get anonymous comments that can be claimed by an authenticated user.
+ * Used to display the claim prompt modal after login/signup.
+ */
+export const getAnonymousCommentsForClaiming = query({
+  args: {
+    anonymousId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Validate UUID format
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(args.anonymousId)) {
+      return [];
+    }
+
+    const comments = await ctx.db
+      .query("comments")
+      .withIndex("by_anonymous_id", (q) => q.eq("anonymousId", args.anonymousId))
+      .collect();
+
+    // Filter to only claimable comments (no authorId, not previously declined)
+    const claimable = comments.filter(
+      (c) => !c.authorId && c.claimedByUser !== false
+    );
+
+    // Join with track data for display
+    const commentsWithTrack = await Promise.all(
+      claimable.map(async (comment) => {
+        const track = await ctx.db.get(comment.trackId);
+        return {
+          _id: comment._id,
+          commentText: comment.commentText,
+          authorName: comment.authorName,
+          hasAttachment: !!comment.attachmentR2Key,
+          attachmentFileName: comment.attachmentFileName,
+          trackTitle: track?.title ?? "Unknown Track",
+          timestamp: comment.timestamp,
+          _creationTime: comment._creationTime,
+        };
+      })
+    );
+
+    return commentsWithTrack;
+  },
+});
+
+/**
+ * Claim anonymous comments for the current authenticated user.
+ * Supports selective claiming - only specified comments are claimed, rest are declined.
  */
 export const claimAnonymousComments = mutation({
   args: {
     anonymousId: v.string(),
+    commentIds: v.optional(v.array(v.id("comments"))), // specific comments to claim
+    declineAll: v.optional(v.boolean()), // mark all as permanently declined
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -290,24 +339,62 @@ export const claimAnonymousComments = mutation({
     const authorName = user.name ?? "Anonymous";
 
     // Find all comments with this anonymousId
-    const comments = await ctx.db
+    const allComments = await ctx.db
       .query("comments")
       .withIndex("by_anonymous_id", (q) => q.eq("anonymousId", args.anonymousId))
       .collect();
 
-    // Update each unclaimed comment to belong to the authenticated user
+    // Filter to only unclaimed comments that haven't been previously declined
+    const unclaimedComments = allComments.filter(
+      (c) => !c.authorId && c.claimedByUser !== false
+    );
+
     let claimedCount = 0;
-    for (const comment of comments) {
-      if (!comment.authorId) {
+    let declinedCount = 0;
+
+    if (args.declineAll) {
+      // Mark all as permanently declined
+      for (const comment of unclaimedComments) {
+        await ctx.db.patch(comment._id, {
+          claimedByUser: false,
+        });
+        declinedCount++;
+      }
+    } else if (args.commentIds && args.commentIds.length > 0) {
+      // Claim specific comments, decline the rest
+      const claimSet = new Set(args.commentIds.map((id) => id.toString()));
+
+      for (const comment of unclaimedComments) {
+        if (claimSet.has(comment._id.toString())) {
+          // Claim this comment
+          await ctx.db.patch(comment._id, {
+            authorId: userId,
+            authorName: authorName,
+            anonymousId: undefined,
+            claimedByUser: true,
+          });
+          claimedCount++;
+        } else {
+          // Decline this comment
+          await ctx.db.patch(comment._id, {
+            claimedByUser: false,
+          });
+          declinedCount++;
+        }
+      }
+    } else {
+      // Legacy behavior: claim all (for backward compatibility)
+      for (const comment of unclaimedComments) {
         await ctx.db.patch(comment._id, {
           authorId: userId,
           authorName: authorName,
           anonymousId: undefined,
+          claimedByUser: true,
         });
         claimedCount++;
       }
     }
 
-    return { claimedCount };
+    return { claimedCount, declinedCount };
   },
 });

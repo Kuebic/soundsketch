@@ -74,7 +74,7 @@
 | Optimistic updates (comments) | Done | `commentCreateOptimistic` helper in `src/lib/optimisticUpdates.ts`, wired via `withOptimisticUpdate` in `CommentForm` |
 | Rate limiting (comments) | Done | `convex/lib/rateLimit.ts` helper, 10/min authenticated, 5/min per-track guest. `rateLimits` table in schema |
 | Rate limiting (uploads) | Done | 5 uploads/hour per user via `checkRateLimit` in `convex/versions.ts` |
-| Anonymous user identification | Done | Persistent identity via localStorage (`anonymousId`), funny generated names (adjective-animal), edit/delete authorization, comment claiming on signup/login |
+| Anonymous user identification | Done | Persistent identity via localStorage (`anonymousId`), funny generated names (adjective-animal), edit/delete authorization, optional comment claiming on signup/login via modal (`ClaimCommentsModal`) with selective claim/decline |
 | Username-based authentication | Done | Username field in schema, login via username or email, optional email on signup, password confirmation |
 | Account management | Done | Email editing, password change (with current password verification and session invalidation), account deletion with two modes: "keep_comments" (anonymize) or "delete_everything" (full removal). Cascading deletion of tracks, versions, comments, R2 files, and trackAccess records |
 
@@ -87,7 +87,7 @@
 - **users** — Convex Auth fields + avatarUrl, username. Indexes: email, by_username
 - **tracks** — title, description, creatorId, creatorName, visibility ("public" | "unlisted" | "private"), shareableId, latestVersionId. Indexes: by_creator, by_shareable_id, by_visibility. Search indexes: search_title (title, filterFields: visibility), search_creator (creatorName, filterFields: visibility)
 - **versions** — trackId, versionName, changeNotes, r2Key, r2Bucket, fileName, fileSize, fileFormat, duration, uploadedBy. Index: by_track
-- **comments** — versionId, trackId, authorId (optional), authorName, commentText, timestamp (optional), parentCommentId (threading), attachmentR2Key, attachmentFileName, anonymousId (optional). Indexes: by_version, by_track, by_parent, by_timestamp, by_anonymous_id
+- **comments** — versionId, trackId, authorId (optional), authorName, commentText, timestamp (optional), parentCommentId (threading), attachmentR2Key, attachmentFileName, anonymousId (optional), claimedByUser (optional: true = claimed, false = permanently declined). Indexes: by_version, by_track, by_parent, by_timestamp, by_anonymous_id
 - **rateLimits** — key, timestamps (array). Index: by_key. Used for server-side rate limiting
 - **trackAccess** — trackId, userId, grantedBy, grantedAt. Indexes: by_track, by_user, by_track_and_user
 
@@ -97,7 +97,7 @@
 |------|-----------|--------|
 | `convex/tracks.ts` | create, getPublicTracks, searchPublicTracks, getByShareableId (w/ access control), getMyTracks, updateVisibility, deleteTrack, grantAccess, revokeAccess, getCollaborators, getSharedWithMe | Done |
 | `convex/versions.ts` | create (rate-limited), getByTrack, getById, deleteVersion (w/ fallback) | Done |
-| `convex/comments.ts` | create (guest-friendly, private-track access gated, rate-limited), getByVersion, getTimestampComments (w/ includeAllVersions), getGeneralComments (w/ includeAllVersions), getReplies, deleteComment, updateComment, claimAnonymousComments | Done |
+| `convex/comments.ts` | create (guest-friendly, private-track access gated, rate-limited), getByVersion, getTimestampComments (w/ includeAllVersions), getGeneralComments (w/ includeAllVersions), getReplies, deleteComment, updateComment, getAnonymousCommentsForClaiming, claimAnonymousComments (selective claim/decline) | Done |
 | `convex/migrations.ts` | migrateVisibility (one-time: isPublic → visibility) | Temporary — delete after running |
 | `convex/r2.ts` | getTrackUploadUrl, getTrackDownloadUrl, getAttachmentDownloadUrl, getAttachmentUploadUrl, deleteR2Objects | Done |
 | `convex/users.ts` | viewer (returns `_id` from users table), searchByEmail, getTrackParticipants, updateName (w/ denormalized creatorName propagation), checkUsernameAvailable, updateEmail, changePassword (action: verifies current password, updates credentials, invalidates other sessions), deleteAccount (w/ deletion mode: keep_comments or delete_everything) | Done |
@@ -140,7 +140,6 @@
 | `useDebounce` | `src/hooks/useDebounce.ts` | Generic debounce hook for search input |
 | `useAnonymousIdentity` | `src/hooks/useAnonymousIdentity.ts` | Persistent anonymous identity (funny names like "sneaky-owl") from localStorage |
 | `useAudioRecording` | `src/hooks/useAudioRecording.ts` | Browser MediaRecorder API wrapper — mic access, record/stop, preview blob URL, file export |
-| `useClaimComments` | `src/hooks/useClaimComments.ts` | Claims anonymous comments for authenticated user on signup/login |
 
 ### Pages
 
@@ -152,7 +151,7 @@
 | Upload | `/upload` | Done — file drop, form, progress bar, redirect |
 | Profile | `/profile` | Done — user info with inline name + email editing, track grid with privacy badges + filter, shared tracks section with filter, account settings with password change and delete account (two modes: anonymize comments or delete everything) |
 
-### Components (25 total)
+### Components (26 total)
 
 | Component | Location | Status |
 |-----------|----------|--------|
@@ -163,6 +162,7 @@
 | ErrorFallback | `src/components/ui/ErrorFallback.tsx` | Done — full-page error boundary fallback |
 | PlayerErrorFallback | `src/components/ui/PlayerErrorFallback.tsx` | Done — inline audio player error fallback |
 | LoginForm | `src/components/auth/LoginForm.tsx` | Done — Convex Auth integration, username-based signup/login, optional email, password confirmation |
+| ClaimCommentsModal | `src/components/auth/ClaimCommentsModal.tsx` | Done — Modal to selectively claim anonymous comments after login/signup |
 | TrackPlayer | `src/components/audio/TrackPlayer.tsx` | Done — waveform + timestamp markers + external seek + keyboard shortcuts |
 | PlaybackControls | `src/components/audio/PlaybackControls.tsx` | Done — play/pause, progress, volume, speed |
 | TrackCard | `src/components/tracks/TrackCard.tsx` | Done — reusable card for Home + Profile |
