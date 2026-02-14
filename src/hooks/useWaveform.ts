@@ -78,7 +78,13 @@ export function useWaveform({
   };
 
   const seekTo = (progress: number) => {
-    wavesurferRef.current?.seekTo(progress);
+    const ws = wavesurferRef.current;
+    if (ws) {
+      ws.seekTo(progress);
+      // Update currentTime immediately to keep UI in sync
+      // (timeupdate event may not fire until playback starts)
+      setCurrentTime(progress * ws.getDuration());
+    }
   };
 
   const setVolume = (volume: number) => {
