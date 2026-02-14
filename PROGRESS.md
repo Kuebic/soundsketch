@@ -45,7 +45,7 @@
 
 | Requirement | Status | Implementation |
 |-------------|--------|----------------|
-| Convex Auth (email/password) | Done | `convex/auth.ts`, Password provider, `LoginForm` |
+| Convex Auth (email/password) | Done | `convex/auth.ts`, Password provider with custom profile (name on signup), `LoginForm` |
 | User profiles | Done | `Profile` page, `convex/users.ts` viewer query |
 | Private tracks + access control | Done | `trackAccess` table, `getByShareableId` access checks |
 | Privacy toggle | Done | `TrackSettingsDropdown`, `updatePrivacy` mutation |
@@ -87,7 +87,7 @@
 | `convex/comments.ts` | create (guest-friendly), getByVersion, getTimestampComments (w/ includeAllVersions), getGeneralComments (w/ includeAllVersions), getReplies, deleteComment, updateComment | Done |
 | `convex/r2.ts` | getTrackUploadUrl, getTrackDownloadUrl, getAttachmentDownloadUrl, getAttachmentUploadUrl | Done |
 | `convex/users.ts` | viewer (returns `_id` from users table), searchByEmail, getTrackParticipants, updateName (w/ denormalized creatorName propagation) | Done |
-| `convex/auth.ts` | Convex Auth with Password provider | Done |
+| `convex/auth.ts` | Convex Auth with Password provider, custom profile extracts name on signup | Done |
 | `convex/http.ts` | Auth HTTP routes | Done |
 | `convex/lib/r2Client.ts` | S3-compatible R2 client, generateUploadUrl, generateDownloadUrl | Done |
 
@@ -133,7 +133,7 @@
 | Navbar | `src/components/layout/Navbar.tsx` | Done — logo, auth-conditional buttons |
 | Button | `src/components/ui/Button.tsx` | Done — primary/secondary/danger, sm/md/lg |
 | Modal | `src/components/ui/Modal.tsx` | Done — backdrop blur, ESC close, responsive sizes |
-| LoginForm | `src/components/auth/LoginForm.tsx` | Done — Convex Auth integration |
+| LoginForm | `src/components/auth/LoginForm.tsx` | Done — Convex Auth integration, username field on signup |
 | TrackPlayer | `src/components/audio/TrackPlayer.tsx` | Done — waveform + timestamp markers + external seek |
 | PlaybackControls | `src/components/audio/PlaybackControls.tsx` | Done — play/pause, progress, volume, speed |
 | TrackCard | `src/components/tracks/TrackCard.tsx` | Done — reusable card for Home + Profile |

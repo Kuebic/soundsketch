@@ -25,6 +25,7 @@ function getFriendlyError(err: unknown, isSignUp: boolean): string {
 export function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +40,8 @@ export function LoginForm() {
       await signIn("password", {
         email,
         password,
-        flow: isSignUp ? "signUp" : "signIn"
+        flow: isSignUp ? "signUp" : "signIn",
+        ...(isSignUp && name.trim() ? { name: name.trim() } : {}),
       });
     } catch (err) {
       setError(getFriendlyError(err, isSignUp));
@@ -58,6 +60,22 @@ export function LoginForm() {
         {error && (
           <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">
             {error}
+          </div>
+        )}
+
+        {isSignUp && (
+          <div>
+            <label className="block text-sm font-medium mb-2">Username</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your display name"
+              className="input"
+              required
+              disabled={loading}
+              maxLength={50}
+            />
           </div>
         )}
 
