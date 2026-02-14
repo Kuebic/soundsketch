@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from "convex/react";
 import { api } from '../../convex/_generated/api';
 import { useEffect, useState } from 'react';
@@ -11,6 +11,8 @@ export function Login() {
   const viewer = useQuery(api.users.viewer);
   const isAuthenticated = viewer !== null && viewer !== undefined;
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get('returnTo') || '/';
 
   const [showClaimModal, setShowClaimModal] = useState(false);
   const [anonymousIdForClaim, setAnonymousIdForClaim] = useState<string | null>(null);
@@ -25,14 +27,14 @@ export function Login() {
         setAnonymousIdForClaim(anonymousId);
         setShowClaimModal(true);
       } else {
-        navigate('/');
+        navigate(returnTo);
       }
     }
-  }, [isAuthenticated, hasProcessedAuth, navigate]);
+  }, [isAuthenticated, hasProcessedAuth, navigate, returnTo]);
 
   const handleClaimComplete = () => {
     setShowClaimModal(false);
-    navigate('/');
+    navigate(returnTo);
   };
 
   return (

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { useQuery } from 'convex/react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { api } from '../../convex/_generated/api';
@@ -20,6 +20,7 @@ import type { VersionId } from '@/types';
 
 export function TrackPage() {
   const { shareableId } = useParams<{ shareableId: string }>();
+  const location = useLocation();
   const [selectedVersionId, setSelectedVersionId] = useState<VersionId | null>(null);
   const [timestampForComment, setTimestampForComment] = useState<number | null>(null);
   const [seekToTime, setSeekToTime] = useState<number | null>(null);
@@ -90,7 +91,7 @@ export function TrackPage() {
           <p className="text-studio-text-secondary mb-6">
             This track doesn&apos;t exist or you don&apos;t have permission to view it.
           </p>
-          <Link to="/login" className="text-studio-accent hover:underline">
+          <Link to={`/login?returnTo=${encodeURIComponent(location.pathname)}`} className="text-studio-accent hover:underline">
             Sign in to access private tracks
           </Link>
         </div>
@@ -219,7 +220,7 @@ export function TrackPage() {
           <div className="bg-studio-dark border border-studio-gray rounded-lg px-4 py-3 mb-6 text-sm text-studio-text-secondary">
             <p>
               You are not signed in. Comments will be posted as <strong className="text-studio-text-primary">{anonymousIdentity.name}</strong>.{' '}
-              <Link to="/login" className="text-studio-accent hover:underline">Sign in</Link>{' '}
+              <Link to={`/login?returnTo=${encodeURIComponent(location.pathname)}`} className="text-studio-accent hover:underline">Sign in</Link>{' '}
               to use your own name.
             </p>
           </div>

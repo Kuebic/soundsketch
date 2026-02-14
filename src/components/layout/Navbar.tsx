@@ -82,7 +82,7 @@ export function Navbar() {
                         </Button>
                       </>
                     ) : (
-                      <Link to="/login">
+                      <Link to={`/login?returnTo=${encodeURIComponent(location.pathname)}`}>
                         <Button size="sm">Login</Button>
                       </Link>
                     )}
