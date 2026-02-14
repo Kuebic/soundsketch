@@ -9,6 +9,7 @@ import { VersionSelector } from '@/components/tracks/VersionSelector';
 import { ShareButton } from '@/components/tracks/ShareButton';
 import { TrackSettingsDropdown } from '@/components/tracks/TrackSettingsDropdown';
 import { AddVersionModal } from '@/components/tracks/AddVersionModal';
+import { DownloadButton } from '@/components/tracks/DownloadButton';
 import { CommentForm } from '@/components/comments/CommentForm';
 import { CommentList } from '@/components/comments/CommentList';
 import { Button } from '@/components/ui/Button';
@@ -136,12 +137,17 @@ export function TrackPage() {
                 currentVersionId={selectedVersionId}
                 onVersionChange={setSelectedVersionId}
               />
-              {isOwner && (
-                <Button variant="secondary" size="sm" className="self-start" onClick={() => setShowAddVersion(true)}>
-                  <Plus className="w-4 h-4 mr-1" />
-                  New Version
-                </Button>
-              )}
+              <div className="flex items-center gap-2 self-start">
+                {track.downloadsEnabled && selectedVersionId && (
+                  <DownloadButton versionId={selectedVersionId} />
+                )}
+                {isOwner && (
+                  <Button variant="secondary" size="sm" onClick={() => setShowAddVersion(true)}>
+                    <Plus className="w-4 h-4 mr-1" />
+                    New Version
+                  </Button>
+                )}
+              </div>
             </div>
             {versions.length > 1 && (
               <label className="flex items-center gap-2 text-sm text-studio-text-secondary cursor-pointer">

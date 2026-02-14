@@ -23,6 +23,7 @@ export const create = mutation({
     visibility: v.optional(
       v.union(v.literal("public"), v.literal("unlisted"), v.literal("private"))
     ),
+    downloadsEnabled: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -42,9 +43,20 @@ export const create = mutation({
       visibility: args.visibility ?? "unlisted",
       shareableId,
       latestVersionId: undefined,
+      downloadsEnabled: args.downloadsEnabled ?? false,
     });
 
     return { trackId, shareableId };
+  },
+});
+
+/**
+ * Get track by ID (internal use, no access control)
+ */
+export const getById = query({
+  args: { trackId: v.id("tracks") },
+  handler: async (ctx, args) => {
+    return ctx.db.get(args.trackId);
   },
 });
 
@@ -169,6 +181,31 @@ export const updateVisibility = mutation({
 
     await ctx.db.patch(args.trackId, {
       visibility: args.visibility,
+    });
+  },
+});
+
+/**
+ * Update track downloads enabled setting
+ */
+export const updateDownloadsEnabled = mutation({
+  args: {
+    trackId: v.id("tracks"),
+    enabled: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const track = await ctx.db.get(args.trackId);
+    if (!track) throw new Error("Track not found");
+
+    if (track.creatorId !== userId) {
+      throw new Error("Not authorized");
+    }
+
+    await ctx.db.patch(args.trackId, {
+      downloadsEnabled: args.enabled,
     });
   },
 });

@@ -14,6 +14,8 @@
     "@aws-sdk/client-s3": "^3.989.0",
     "@aws-sdk/s3-request-presigner": "^3.651.0",
     "@convex-dev/auth": "^0.0.60",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "clsx": "^2.1.0",
     "convex": "^1.15.0",
     "lucide-react": "^0.344.0",

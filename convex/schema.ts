@@ -29,6 +29,7 @@ export default defineSchema({
     visibility: v.union(v.literal("public"), v.literal("unlisted"), v.literal("private")),
     shareableId: v.string(), // unique short ID for URLs
     latestVersionId: v.optional(v.id("versions")), // Made optional for initial creation
+    downloadsEnabled: v.optional(v.boolean()), // Allow viewers to download original files
   })
     .index("by_creator", ["creatorId"])
     .index("by_shareable_id", ["shareableId"])
@@ -46,13 +47,18 @@ export default defineSchema({
     trackId: v.id("tracks"),
     versionName: v.string(),
     changeNotes: v.optional(v.string()),
-    r2Key: v.string(),
+    r2Key: v.string(), // Streaming file (MP3 for converted lossless, original for lossy)
     r2Bucket: v.string(),
     fileName: v.string(),
     fileSize: v.number(),
     fileFormat: v.string(),
     duration: v.number(), // seconds
     uploadedBy: v.id("users"),
+    // Original lossless file (only set when WAV/FLAC was converted to MP3)
+    originalR2Key: v.optional(v.string()),
+    originalFileName: v.optional(v.string()),
+    originalFileSize: v.optional(v.number()),
+    originalFileFormat: v.optional(v.string()),
   })
     .index("by_track", ["trackId"]),
 

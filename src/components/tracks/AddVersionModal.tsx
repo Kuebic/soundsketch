@@ -17,7 +17,7 @@ export function AddVersionModal({ isOpen, onClose, trackId }: AddVersionModalPro
   const [file, setFile] = useState<File | null>(null);
   const [versionName, setVersionName] = useState('');
   const [changeNotes, setChangeNotes] = useState('');
-  const { uploadFile, uploading, progress, error } = useFileUpload();
+  const { uploadFile, uploading, progress, stage, error } = useFileUpload();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,7 +76,7 @@ export function AddVersionModal({ isOpen, onClose, trackId }: AddVersionModalPro
               />
             </div>
             <p className="text-xs text-studio-text-secondary mono text-center">
-              Uploading... {Math.round(progress)}%
+              {stage === 'converting' ? 'Converting to MP3...' : 'Uploading...'} {Math.round(progress)}%
             </p>
           </div>
         )}

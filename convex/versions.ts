@@ -16,6 +16,11 @@ export const create = mutation({
     fileSize: v.number(),
     fileFormat: v.string(),
     duration: v.number(),
+    // Original lossless file (only set when WAV/FLAC was converted to MP3)
+    originalR2Key: v.optional(v.string()),
+    originalFileName: v.optional(v.string()),
+    originalFileSize: v.optional(v.number()),
+    originalFileFormat: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -42,6 +47,11 @@ export const create = mutation({
       fileFormat: args.fileFormat,
       duration: args.duration,
       uploadedBy: userId,
+      // Original file fields (only set for converted lossless files)
+      originalR2Key: args.originalR2Key,
+      originalFileName: args.originalFileName,
+      originalFileSize: args.originalFileSize,
+      originalFileFormat: args.originalFileFormat,
     });
 
     // Update track's latest version

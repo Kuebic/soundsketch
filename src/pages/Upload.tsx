@@ -7,19 +7,20 @@ import { useFileUpload } from '@/hooks/useFileUpload';
 import { Navbar } from '@/components/layout/Navbar';
 import { FileDropZone } from '@/components/upload/FileDropZone';
 import { Button } from '@/components/ui/Button';
-import { Loader2, Globe, Link2, Lock } from 'lucide-react';
+import { Loader2, Globe, Link2, Lock, Download } from 'lucide-react';
 
 export function Upload() {
   const viewer = useQuery(api.users.viewer);
   const navigate = useNavigate();
   const createTrack = useMutation(api.tracks.create);
-  const { uploadFile, uploading, progress, error: uploadError } = useFileUpload();
+  const { uploadFile, uploading, progress, stage, error: uploadError } = useFileUpload();
 
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<"public" | "unlisted" | "private">("unlisted");
   const [versionName, setVersionName] = useState('v1');
+  const [downloadsEnabled, setDownloadsEnabled] = useState(false);
 
   // Auth guard
   if (viewer === undefined) {
@@ -48,6 +49,7 @@ export function Upload() {
         title: title.trim(),
         description: description.trim() || undefined,
         visibility,
+        downloadsEnabled,
       });
 
       // Step 2: Upload file to R2 and save version metadata
@@ -143,6 +145,34 @@ export function Upload() {
             />
           </div>
 
+          {/* Downloads */}
+          <div className="flex items-start gap-3">
+            <button
+              type="button"
+              onClick={() => setDownloadsEnabled(!downloadsEnabled)}
+              className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                downloadsEnabled
+                  ? 'bg-studio-accent border-studio-accent'
+                  : 'border-studio-gray hover:border-studio-text-secondary'
+              }`}
+            >
+              {downloadsEnabled && (
+                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
+            <div className="flex-1">
+              <label className="text-sm font-medium flex items-center gap-1.5 cursor-pointer" onClick={() => setDownloadsEnabled(!downloadsEnabled)}>
+                <Download className="w-4 h-4" />
+                Allow downloads
+              </label>
+              <p className="text-xs text-studio-text-secondary mt-0.5">
+                Viewers can download the original audio file (WAV/FLAC files are converted to MP3 for streaming but originals are preserved for download)
+              </p>
+            </div>
+          </div>
+
           {/* Progress Bar */}
           {uploading && (
             <div className="space-y-1">
@@ -153,7 +183,7 @@ export function Upload() {
                 />
               </div>
               <p className="text-xs text-studio-text-secondary mono text-center">
-                Uploading... {Math.round(progress)}%
+                {stage === 'converting' ? 'Converting to MP3...' : 'Uploading...'} {Math.round(progress)}%
               </p>
             </div>
           )}

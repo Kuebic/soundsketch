@@ -6,7 +6,7 @@ import { api } from '../../../convex/_generated/api';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { ManageCollaboratorsModal } from './ManageCollaboratorsModal';
-import { Settings, Globe, Lock, Link2, Trash2, Users } from 'lucide-react';
+import { Settings, Globe, Lock, Link2, Trash2, Users, Download, X } from 'lucide-react';
 import type { Track } from '@/types';
 
 interface TrackSettingsDropdownProps {
@@ -21,7 +21,10 @@ export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
 
   const navigate = useNavigate();
   const updateVisibility = useMutation(api.tracks.updateVisibility);
+  const updateDownloadsEnabled = useMutation(api.tracks.updateDownloadsEnabled);
   const deleteTrack = useMutation(api.tracks.deleteTrack);
+
+  const downloadsEnabled = track.downloadsEnabled ?? false;
 
   const handleVisibilityChange = async (newVisibility: "public" | "unlisted" | "private") => {
     try {
@@ -30,6 +33,16 @@ export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
       setOpen(false);
     } catch {
       toast.error('Failed to update visibility');
+    }
+  };
+
+  const handleDownloadsToggle = async () => {
+    try {
+      await updateDownloadsEnabled({ trackId: track._id, enabled: !downloadsEnabled });
+      toast.success(downloadsEnabled ? 'Downloads disabled' : 'Downloads enabled');
+      setOpen(false);
+    } catch {
+      toast.error('Failed to update download settings');
     }
   };
 
@@ -77,6 +90,25 @@ export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
                   {label}
                 </button>
               ))}
+            <button
+              onClick={handleDownloadsToggle}
+              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-studio-dark text-left"
+            >
+              {downloadsEnabled ? (
+                <>
+                  <span className="relative">
+                    <Download className="w-4 h-4" />
+                    <X className="w-2.5 h-2.5 absolute -top-0.5 -right-0.5 text-red-400" />
+                  </span>
+                  Disable Downloads
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  Enable Downloads
+                </>
+              )}
+            </button>
             <button
               onClick={() => { setOpen(false); setShowCollaborators(true); }}
               className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-studio-dark text-left"
