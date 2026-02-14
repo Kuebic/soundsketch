@@ -51,7 +51,7 @@
 | Unlisted tracks | Done | Three-level visibility: public/unlisted/private. Unlisted tracks accessible via link but not listed on home page. |
 | Visibility settings | Done | `TrackSettingsDropdown`, `updateVisibility` mutation (replaces `updatePrivacy`) |
 | Track deletion | Done | `deleteTrack` mutation with confirmation modal |
-| Comment attachments | Done | `useAttachmentUpload` hook, `CommentForm` file picker, inline previews: image thumbnails with fullscreen lightbox (`ImageLightbox`), audio player; download for all types |
+| Comment attachments | Done | `useAttachmentUpload` hook, `CommentForm` file picker + audio recording (`AudioRecordingModal`, `useAudioRecording`), inline previews: image thumbnails with fullscreen lightbox (`ImageLightbox`), audio player; download for all types |
 | Show comments across versions | Done | `includeAllVersions` param in queries, toggle in `TrackPage` |
 | Responsive design | Done | Tailwind responsive classes throughout |
 | Loading states + error handling | Done | Conditional rendering, error boundaries, toast notifications |
@@ -120,7 +120,7 @@
 | Toast notifications | `sonner` in `src/App.tsx` | Dark-themed toaster, bottom-right, used across all mutation/action feedback |
 | Error boundaries | `react-error-boundary` in `src/App.tsx`, `src/pages/TrackPage.tsx` | Global + player-specific boundaries with themed fallbacks |
 | OG meta tags | `index.html` | Static OG/Twitter Card tags, description, theme-color, placeholder image |
-| Utility functions | `src/lib/utils.ts` | cn, formatDuration, formatFileSize, validateAudioFile, validateAttachmentFile, getAttachmentType, generateShareableLink, formatRelativeTime |
+| Utility functions | `src/lib/utils.ts` | cn, formatDuration, formatFileSize, validateAudioFile, validateAttachmentFile, getAttachmentType, generateShareableLink, formatRelativeTime, getRecordingMimeType, mimeToExtension |
 | Anonymous user utils | `src/lib/anonymousUser.ts` | generateAnonymousName, generateAnonymousId, getAnonymousIdentity (localStorage persistence) |
 | Optimistic updates | `src/lib/optimisticUpdates.ts` | `commentCreateOptimistic` — patches local query cache for instant comment appearance |
 | Type definitions | `src/types/index.ts` | Track, Version, Comment, User type exports |
@@ -138,6 +138,7 @@
 | `useKeyboardShortcuts` | `src/hooks/useKeyboardShortcuts.ts` | Spacebar play/pause, arrow key seeking (±5s), input-aware |
 | `useDebounce` | `src/hooks/useDebounce.ts` | Generic debounce hook for search input |
 | `useAnonymousIdentity` | `src/hooks/useAnonymousIdentity.ts` | Persistent anonymous identity (funny names like "sneaky-owl") from localStorage |
+| `useAudioRecording` | `src/hooks/useAudioRecording.ts` | Browser MediaRecorder API wrapper — mic access, record/stop, preview blob URL, file export |
 
 ### Pages
 
@@ -149,7 +150,7 @@
 | Upload | `/upload` | Done — file drop, form, progress bar, redirect |
 | Profile | `/profile` | Done — user info with inline name editing, track grid with privacy badges + filter, shared tracks section with filter |
 
-### Components (24 total)
+### Components (25 total)
 
 | Component | Location | Status |
 |-----------|----------|--------|
@@ -168,12 +169,13 @@
 | TrackSettingsDropdown | `src/components/tracks/TrackSettingsDropdown.tsx` | Done — privacy toggle, delete, manage collaborators |
 | AddVersionModal | `src/components/tracks/AddVersionModal.tsx` | Done — file upload + version metadata |
 | ManageCollaboratorsModal | `src/components/tracks/ManageCollaboratorsModal.tsx` | Done — invite by email, list/remove collaborators |
-| CommentForm | `src/components/comments/CommentForm.tsx` | Done — text input, optional timestamp, file attachment, @mention support |
+| CommentForm | `src/components/comments/CommentForm.tsx` | Done — text input, optional timestamp, file attachment, audio recording, @mention support |
 | CommentItem | `src/components/comments/CommentItem.tsx` | Done — display, edit, delete, reply, timestamp click, inline attachment previews (image thumbnail + lightbox, audio player), download, mention highlighting, anonymous user edit/delete authorization |
 | ImageLightbox | `src/components/comments/ImageLightbox.tsx` | Done — fullscreen image viewer with download button, ESC/backdrop close |
 | CommentList | `src/components/comments/CommentList.tsx` | Done — renders top-level comments |
 | TimestampMarker | `src/components/comments/TimestampMarker.tsx` | Done — waveform overlay markers |
 | MentionInput | `src/components/comments/MentionInput.tsx` | Done — textarea with @mention autocomplete dropdown |
+| AudioRecordingModal | `src/components/comments/AudioRecordingModal.tsx` | Done — record voice feedback via browser mic, preview, attach to comment |
 | TrackFilter | `src/components/tracks/TrackFilter.tsx` | Done — inline filter input for Profile page sections |
 | FileDropZone | `src/components/upload/FileDropZone.tsx` | Done — drag-drop + validation |
 

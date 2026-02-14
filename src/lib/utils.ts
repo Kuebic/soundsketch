@@ -60,7 +60,7 @@ export function validateAudioFile(file: File): { valid: boolean; error?: string 
 export function validateAttachmentFile(file: File): { valid: boolean; error?: string } {
   const maxSize = 50 * 1024 * 1024; // 50MB
   const allowedFormats = [
-    'mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg',
+    'mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'webm',
     'png', 'jpg', 'jpeg', 'gif', 'webp',
     'pdf', 'txt',
   ];
@@ -89,7 +89,7 @@ export function validateAttachmentFile(file: File): { valid: boolean; error?: st
 export function getAttachmentType(fileName: string): 'audio' | 'image' | 'pdf' | 'text' | 'unknown' {
   const ext = fileName.split('.').pop()?.toLowerCase();
   if (!ext) return 'unknown';
-  if (['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg'].includes(ext)) return 'audio';
+  if (['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'webm'].includes(ext)) return 'audio';
   if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) return 'image';
   if (ext === 'pdf') return 'pdf';
   if (ext === 'txt') return 'text';
@@ -120,4 +120,34 @@ export function formatRelativeTime(timestamp: number): string {
   if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
   if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
   return 'just now';
+}
+
+/**
+ * Get the best supported MIME type for audio recording
+ */
+export function getRecordingMimeType(): string {
+  if (typeof MediaRecorder === 'undefined') return 'audio/webm';
+
+  const types = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/ogg;codecs=opus',
+    'audio/mp4',
+  ];
+
+  for (const type of types) {
+    if (MediaRecorder.isTypeSupported(type)) return type;
+  }
+
+  return 'audio/webm';
+}
+
+/**
+ * Get file extension from MIME type
+ */
+export function mimeToExtension(mimeType: string): string {
+  if (mimeType.includes('webm')) return 'webm';
+  if (mimeType.includes('ogg')) return 'ogg';
+  if (mimeType.includes('mp4')) return 'm4a';
+  return 'webm';
 }

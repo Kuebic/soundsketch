@@ -8,7 +8,8 @@ import { useAttachmentUpload } from '@/hooks/useAttachmentUpload';
 import { useAnonymousIdentity } from '@/hooks/useAnonymousIdentity';
 import { commentCreateOptimistic } from '@/lib/optimisticUpdates';
 import { formatDuration, formatFileSize, validateAttachmentFile, getAttachmentType } from '@/lib/utils';
-import { Send, X, Clock, Paperclip, FileAudio, Image, FileText, File, Loader2 } from 'lucide-react';
+import { Send, X, Clock, Paperclip, FileAudio, Image, FileText, File, Loader2, Mic } from 'lucide-react';
+import { AudioRecordingModal } from './AudioRecordingModal';
 import type { TrackId, VersionId, CommentId } from '@/types';
 
 interface CommentFormProps {
@@ -42,6 +43,7 @@ export function CommentForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [showRecordingModal, setShowRecordingModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const viewer = useQuery(api.users.viewer);
   const anonymousIdentity = useAnonymousIdentity();
@@ -171,6 +173,15 @@ export function CommentForm({
           >
             <Paperclip className="w-4 h-4" />
           </button>
+          <button
+            type="button"
+            onClick={() => setShowRecordingModal(true)}
+            disabled={submitting || uploading}
+            className="p-1.5 rounded text-studio-text-secondary hover:text-studio-text-primary hover:bg-studio-dark transition-colors disabled:opacity-50"
+            title="Record audio"
+          >
+            <Mic className="w-4 h-4" />
+          </button>
           {onCancel && (
             <Button
               type="button"
@@ -226,6 +237,15 @@ export function CommentForm({
       {(error || uploadError) && (
         <p className="text-xs text-red-400">{error || uploadError}</p>
       )}
+
+      <AudioRecordingModal
+        isOpen={showRecordingModal}
+        onClose={() => setShowRecordingModal(false)}
+        onRecordingComplete={(file) => {
+          setAttachmentFile(file);
+          setShowRecordingModal(false);
+        }}
+      />
     </form>
   );
 }
