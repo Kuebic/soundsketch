@@ -97,8 +97,8 @@ export function Upload() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What's this track about?"
-              rows={3}
-              className="input w-full resize-none"
+              rows={4}
+              className="input w-full resize-y min-h-[6rem]"
             />
           </div>
 

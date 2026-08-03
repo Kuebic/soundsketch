@@ -10,6 +10,7 @@ import { ShareButton } from '@/components/tracks/ShareButton';
 import { TrackSettingsDropdown } from '@/components/tracks/TrackSettingsDropdown';
 import { AddVersionModal } from '@/components/tracks/AddVersionModal';
 import { DownloadButton } from '@/components/tracks/DownloadButton';
+import { TrackDescription } from '@/components/tracks/TrackDescription';
 import { CommentForm } from '@/components/comments/CommentForm';
 import { CommentList } from '@/components/comments/CommentList';
 import { Button } from '@/components/ui/Button';
@@ -124,7 +125,7 @@ export function TrackPage() {
             </div>
           </div>
           {track.description && (
-            <p className="text-sm text-studio-text-secondary mt-2">{track.description}</p>
+            <TrackDescription description={track.description} className="mt-2" />
           )}
         </div>
 
