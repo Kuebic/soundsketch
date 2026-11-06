@@ -1,20 +1,21 @@
-import { useState, useMemo } from 'react';
-import { useQuery, useMutation } from 'convex/react';
+import { useState } from 'react';
+import { useMutation } from 'convex/react';
 import { toast } from 'sonner';
 import { api } from '../../../convex/_generated/api';
 import { Button } from '@/components/ui/Button';
 import { CommentForm } from './CommentForm';
 import { ImageLightbox } from './ImageLightbox';
-import { useAttachmentUrl } from '@/hooks/useAttachmentUrl';
-import { formatDuration, formatRelativeTime, getAttachmentType } from '@/lib/utils';
+import { useAttachmentUrl } from '@/hooks/useSignedUrl';
+import { attachmentKind } from '@/lib/fileTypes';
+import { formatDuration, formatRelativeTime } from '@/lib/utils';
 import { Clock, Reply, Trash2, Pencil, ChevronDown, ChevronRight, Download, FileAudio, Image, FileText, File, Loader2 } from 'lucide-react';
-import type { Comment, TrackId, VersionId, UserId } from '@/types';
+import type { CommentView, TrackId, VersionId } from '@/types';
 
 interface CommentItemProps {
-  comment: Comment;
-  currentUserId?: UserId;
-  currentAnonymousId?: string;
-  isTrackOwner?: boolean;
+  comment: CommentView;
+  /** Replies, for thread roots. Undefined when rendering a reply. */
+  replies?: CommentView[];
+  anonymousId?: string;
   onTimestampClick?: (timestamp: number) => void;
   versionId: VersionId;
   trackId: TrackId;
@@ -30,9 +31,8 @@ const attachmentTypeIcons = {
 
 export function CommentItem({
   comment,
-  currentUserId,
-  currentAnonymousId,
-  isTrackOwner,
+  replies,
+  anonymousId,
   onTimestampClick,
   versionId,
   trackId,
@@ -47,49 +47,22 @@ export function CommentItem({
   const [deleting, setDeleting] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
-  // Only fetch reply count for top-level comments
-  const replyCount = useQuery(
-    api.comments.getReplyCount,
-    !comment.parentCommentId ? { parentCommentId: comment._id } : 'skip'
-  );
-  const replies = useQuery(
-    api.comments.getReplies,
-    showReplies ? { parentCommentId: comment._id } : 'skip'
-  );
   const deleteComment = useMutation(api.comments.deleteComment);
   const updateComment = useMutation(api.comments.updateComment);
 
-  const hasAttachment = comment.attachmentR2Key && comment.attachmentFileName;
-  const attachmentType = hasAttachment ? getAttachmentType(comment.attachmentFileName!) : 'unknown';
+  const hasAttachment = comment.hasAttachment && !!comment.attachmentFileName;
+  const attachmentType = hasAttachment ? attachmentKind(comment.attachmentFileName!) : 'unknown';
   const { url: attachmentUrl, loading: attachmentUrlLoading } = useAttachmentUrl(
-    hasAttachment ? comment.attachmentR2Key! : undefined
+    hasAttachment ? comment._id : undefined
   );
-  const AttachmentIcon = hasAttachment
-    ? attachmentTypeIcons[attachmentType]
-    : File;
-
-  // Fix: proper authorization check that handles anonymous users
-  const canModify = useMemo(() => {
-    // Logged in user: must match authorId (both must exist)
-    if (currentUserId && comment.authorId) {
-      return currentUserId === comment.authorId;
-    }
-    // Anonymous user: must have anonymousId AND it must match
-    if (currentAnonymousId && comment.anonymousId) {
-      return currentAnonymousId === comment.anonymousId;
-    }
-    // No match - cannot modify
-    return false;
-  }, [currentUserId, currentAnonymousId, comment.authorId, comment.anonymousId]);
-
-  const canDelete = canModify || isTrackOwner;
+  const AttachmentIcon = attachmentTypeIcons[attachmentType];
 
   const handleDelete = async () => {
     try {
       setDeleting(true);
       await deleteComment({
         commentId: comment._id,
-        anonymousId: currentAnonymousId,
+        anonymousId,
       });
     } catch {
       toast.error('Failed to delete comment');
@@ -108,7 +81,7 @@ export function CommentItem({
       } = {
         commentId: comment._id,
         commentText: editText.trim(),
-        anonymousId: currentAnonymousId,
+        anonymousId,
       };
       if (comment.timestamp !== undefined) {
         args.timestamp = editMinutes * 60 + editSeconds;
@@ -321,7 +294,7 @@ export function CommentItem({
             <Reply className="w-3 h-3" />
             Reply
           </button>
-          {canModify && (
+          {comment.canEdit && (
             <button
               onClick={() => setEditing(true)}
               className="flex items-center gap-1 text-xs text-studio-text-secondary hover:text-studio-text-primary"
@@ -330,7 +303,7 @@ export function CommentItem({
               Edit
             </button>
           )}
-          {canDelete && (
+          {comment.canDelete && (
             <button
               onClick={handleDelete}
               disabled={deleting}
@@ -349,7 +322,7 @@ export function CommentItem({
           <CommentForm
             versionId={versionId}
             trackId={trackId}
-            parentCommentId={comment._id}
+            parentCommentId={comment.parentCommentId ?? comment._id}
             placeholder="Write a reply..."
             onSubmit={() => {
               setShowReplyForm(false);
@@ -361,25 +334,23 @@ export function CommentItem({
       )}
 
       {/* Replies */}
-      {!comment.parentCommentId && replyCount !== undefined && replyCount > 0 && (
+      {replies && replies.length > 0 && (
         <div className="mt-2">
           <button
             onClick={() => setShowReplies(!showReplies)}
             className="flex items-center gap-1 text-xs text-studio-text-secondary hover:text-studio-text-primary"
           >
             {showReplies ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-            {showReplies ? 'Hide replies' : `Show replies (${replyCount})`}
+            {showReplies ? 'Hide replies' : `Show replies (${replies.length})`}
           </button>
 
-          {showReplies && replies && replies.length > 0 && (
+          {showReplies && (
             <div className="mt-2 space-y-2 ml-2">
               {replies.map((reply) => (
                 <CommentItem
                   key={reply._id}
                   comment={reply}
-                  currentUserId={currentUserId}
-                  currentAnonymousId={currentAnonymousId}
-                  isTrackOwner={isTrackOwner}
+                  anonymousId={anonymousId}
                   onTimestampClick={onTimestampClick}
                   versionId={versionId}
                   trackId={trackId}

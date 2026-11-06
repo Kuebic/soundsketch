@@ -13,21 +13,16 @@ interface DownloadButtonProps {
 
 export function DownloadButton({ versionId, disabled }: DownloadButtonProps) {
   const [downloading, setDownloading] = useState(false);
-  const getDownloadUrl = useAction(api.r2.getOriginalDownloadUrl);
+  const getDownloadUrl = useAction(api.r2.getVersionDownloadUrl);
 
   const handleDownload = async () => {
     try {
       setDownloading(true);
       const result = await getDownloadUrl({ versionId });
 
-      if (!result) {
-        toast.error('Download not available');
-        return;
-      }
-
       // Create temporary anchor and trigger download
       const a = document.createElement('a');
-      a.href = result.downloadUrl;
+      a.href = result.url;
       a.download = result.fileName;
       document.body.appendChild(a);
       a.click();

@@ -1,10 +1,13 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { checkRateLimit } from "./lib/rateLimit";
+import { readTrack, requireTrack, requireVersion } from "./lib/access";
+import { cascadeDelete } from "./lib/cascade";
+import { isVersionKeyFor } from "./lib/storageKeys";
 
 /**
- * Create a new version for a track
+ * Register an uploaded version. The client first uploads to URLs from
+ * r2.getVersionUploadUrls, then passes the returned keys here.
  */
 export const create = mutation({
   args: {
@@ -23,107 +26,61 @@ export const create = mutation({
     originalFileFormat: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
+    const { userId } = await requireTrack(ctx, args.trackId, "own");
 
-    const track = await ctx.db.get(args.trackId);
-    if (!track) throw new Error("Track not found");
-
-    if (track.creatorId !== userId) {
-      throw new Error("Not authorized");
+    const keys = [args.r2Key, args.originalR2Key].filter((k): k is string => !!k);
+    if (!keys.every((key) => isVersionKeyFor(args.trackId, key))) {
+      throw new Error("Invalid file key");
     }
+    const versionName = args.versionName.trim();
+    if (!versionName) throw new Error("Version name cannot be empty");
 
     // Rate limit: 5 uploads per hour
     await checkRateLimit(ctx, `upload:${userId}`, 5, 3_600_000);
 
     const versionId = await ctx.db.insert("versions", {
-      trackId: args.trackId,
-      versionName: args.versionName,
-      changeNotes: args.changeNotes,
-      r2Key: args.r2Key,
+      ...args,
+      versionName,
+      changeNotes: args.changeNotes?.trim() || undefined,
       r2Bucket: process.env.R2_BUCKET_NAME || "soundsketch-files",
-      fileName: args.fileName,
-      fileSize: args.fileSize,
-      fileFormat: args.fileFormat,
-      duration: args.duration,
-      uploadedBy: userId,
-      // Original file fields (only set for converted lossless files)
-      originalR2Key: args.originalR2Key,
-      originalFileName: args.originalFileName,
-      originalFileSize: args.originalFileSize,
-      originalFileFormat: args.originalFileFormat,
+      uploadedBy: userId!,
     });
 
-    // Update track's latest version
-    await ctx.db.patch(args.trackId, {
-      latestVersionId: versionId,
-    });
-
+    await ctx.db.patch(args.trackId, { latestVersionId: versionId });
     return versionId;
   },
 });
 
 /**
- * Get all versions for a track
+ * All versions of a track, newest first. Empty if the viewer can't see the track.
  */
 export const getByTrack = query({
   args: { trackId: v.id("tracks") },
   handler: async (ctx, args) => {
-    return ctx.db
+    if (!(await readTrack(ctx, args.trackId))) return [];
+
+    const versions = await ctx.db
       .query("versions")
       .withIndex("by_track", (q) => q.eq("trackId", args.trackId))
       .order("desc")
       .collect();
+    // Storage keys stay server-side; files are reached through r2.* by versionId.
+    return versions.map(({ r2Key: _r2Key, originalR2Key, r2Bucket: _r2Bucket, ...version }) => ({
+      ...version,
+      hasOriginal: !!originalR2Key,
+    }));
   },
 });
 
 /**
- * Get a single version by ID
- */
-export const getById = query({
-  args: { versionId: v.id("versions") },
-  handler: async (ctx, args) => {
-    return ctx.db.get(args.versionId);
-  },
-});
-
-/**
- * Delete a version
+ * Delete a version with its comments and files
  */
 export const deleteVersion = mutation({
   args: {
     versionId: v.id("versions"),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-
-    const version = await ctx.db.get(args.versionId);
-    if (!version) throw new Error("Version not found");
-
-    const track = await ctx.db.get(version.trackId);
-    if (!track) throw new Error("Track not found");
-
-    if (track.creatorId !== userId) {
-      throw new Error("Not authorized");
-    }
-
-    // Delete version
-    await ctx.db.delete(args.versionId);
-
-    // If this was the latest version, update track to use previous version
-    if (track.latestVersionId === args.versionId) {
-      const remainingVersions = await ctx.db
-        .query("versions")
-        .withIndex("by_track", (q) => q.eq("trackId", version.trackId))
-        .order("desc")
-        .take(1);
-
-      if (remainingVersions.length > 0) {
-        await ctx.db.patch(track._id, {
-          latestVersionId: remainingVersions[0]._id,
-        });
-      }
-    }
+    await requireVersion(ctx, args.versionId, "own");
+    await cascadeDelete(ctx, [{ kind: "version", id: args.versionId }]);
   },
 });

@@ -13,6 +13,11 @@ A web app for musicians to share demo tracks with collaborators. Think SoundClou
 ## Project Structure
 ```
 ├── convex/          # Convex backend (schema, queries, mutations, R2 actions)
+│   ├── lib/access.ts      # Track access policy — every function asks it
+│   ├── lib/cascade.ts     # The only code that deletes tracks/versions/comments
+│   ├── lib/storageKeys.ts # R2 key minting + prefix checks
+│   ├── storage.ts         # Internal queries: authorize file access by id
+│   └── r2.ts              # Node actions: signed URLs by versionId/commentId
 ├── src/
 │   ├── components/
 │   │   ├── audio/       # TrackPlayer, PlaybackControls
@@ -23,9 +28,9 @@ A web app for musicians to share demo tracks with collaborators. Think SoundClou
 │   │   ├── ui/          # Custom Button, Modal components
 │   │   └── upload/      # FileDropZone
 │   ├── pages/       # Home, Login, TrackPage, Upload, Profile
-│   ├── hooks/       # useWaveform, usePresignedUrl, useFileUpload, useAudioDuration
-│   ├── lib/         # Convex client, utilities (cn, formatters, validators)
-│   └── types/       # TypeScript type definitions
+│   ├── hooks/       # useWaveform, useSignedUrl, useFileUpload, useAttachmentUpload, ...
+│   ├── lib/         # Convex client, fileTypes registry, r2Upload, utils
+│   └── types/       # Client view types derived from Convex function return types
 ```
 
 ## Key Concepts
@@ -36,11 +41,21 @@ A web app for musicians to share demo tracks with collaborators. Think SoundClou
 - **Users** own tracks and can make them public/private
 - Audio files live in R2, metadata in Convex
 
-### R2 Integration Pattern
-- Frontend requests presigned URL from Convex action
-- Upload/download happens directly between browser and R2
-- Convex stores only the R2 key and metadata
-- URLs expire (5min for PUT, 1hr for GET)
+Domain terms are defined in `GLOSSARY.md`. Decisions not to revisit are in `docs/adr/`.
+
+### Access control (`convex/lib/access.ts`)
+- Every query/mutation/action that touches a track, version, comment or file goes through `readTrack`/`requireTrack` or `readVersion`/`requireVersion`. Never compare `creatorId` or query `trackAccess` by hand.
+- Roles: `owner`, `collaborator`, `guest` (public/unlisted viewer). Queries return null/empty for no access; mutations throw.
+- The client never decides permissions: use `track.viewerRole` and each comment's `canEdit`/`canDelete` from `comments.listThreads`.
+
+### Deletion (`convex/lib/cascade.ts`)
+- Delete tracks, versions and comments only via `cascadeDelete(ctx, targets)`. It removes child rows and schedules R2 cleanup. A new child table or file field → update `cascade.ts` and its test.
+
+### R2 Integration Pattern (ADR 0001)
+- Clients never send or receive stored R2 keys. They ask for URLs by `versionId`/`commentId` (`r2.getVersionStreamUrl`, `r2.getAttachmentUrl`, ...); `convex/storage.ts` checks access and resolves the key.
+- Upload: server mints the key (`r2.getVersionUploadUrls`, `r2.getAttachmentUploadUrl`), browser PUTs to R2, mutation saves the key after checking it sits under the track's prefix.
+- URLs expire (5min for PUT, 1hr for GET); `useSignedUrl` caches GETs for 55min.
+- Accepted formats and size limits live only in `src/lib/fileTypes.ts`.
 
 ### Wavesurfer.js
 - Used for waveform visualization and playback
@@ -88,6 +103,7 @@ R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME
 - Auth configuration: `convex/auth.ts` (Password provider)
 
 ## After Making Changes
+- **Run `npm test`** (Vitest + convex-test). Backend tests go in `convex/*.test.ts` and call functions through `api`/`internal`, using `setup()`/`signIn()` from `convex/test.setup.ts`.
 - **Run `npm run typecheck`** to check for TypeScript errors.
 - **Run `npm run lint`** to check for ESLint issues. Use `npm run lint -- --fix` to auto-fix.
 - **Update `PROGRESS.md`** after adding, removing, or modifying features, components, pages, hooks, or backend functions. Keep the PRD phase coverage, file inventories, and "not yet implemented" sections accurate.
@@ -99,7 +115,8 @@ R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME
 - `npm run lint` - Run ESLint
 - `npm run lint -- --fix` - Fix auto-fixable lint issues  
 - `npm run typecheck` - Run TypeScript type checking
-- `npx convex dev` - Start Convex dev server (auto-generates types)
+- `npm test` - Run tests once (`npm run test:watch` to watch)
+- `npx convex dev` - Start Convex dev server (auto-generates types; `npx convex codegen` regenerates `convex/_generated` after adding a module)
 
 **Do not run:** `npm run dev` (assume already running), `npm run build` (CI only)
 

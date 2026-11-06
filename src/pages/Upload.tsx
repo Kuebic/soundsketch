@@ -13,6 +13,7 @@ export function Upload() {
   const viewer = useQuery(api.users.viewer);
   const navigate = useNavigate();
   const createTrack = useMutation(api.tracks.create);
+  const deleteTrack = useMutation(api.tracks.deleteTrack);
   const { uploadFile, uploading, progress, stage, error: uploadError } = useFileUpload();
 
   const [file, setFile] = useState<File | null>(null);
@@ -52,8 +53,14 @@ export function Upload() {
         downloadsEnabled,
       });
 
-      // Step 2: Upload file to R2 and save version metadata
-      await uploadFile(file, trackId, versionName.trim() || 'v1');
+      // Step 2: Upload file to R2 and save version metadata.
+      // Don't leave an empty track behind if this fails.
+      try {
+        await uploadFile(file, trackId, versionName.trim() || 'v1');
+      } catch (err) {
+        await deleteTrack({ trackId }).catch(() => {});
+        throw err;
+      }
 
       // Step 3: Navigate to the new track
       navigate(`/track/${shareableId}`);

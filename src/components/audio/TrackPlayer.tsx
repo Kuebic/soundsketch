@@ -1,10 +1,11 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { useWaveform } from '@/hooks/useWaveform';
-import { usePresignedUrl } from '@/hooks/usePresignedUrl';
+import { useVersionStreamUrl } from '@/hooks/useSignedUrl';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { PlaybackControls } from './PlaybackControls';
 import { TimestampMarker } from '@/components/comments/TimestampMarker';
 import { Loader2 } from 'lucide-react';
+import type { VersionId } from '@/types';
 
 interface TimestampComment {
   id: string;
@@ -14,7 +15,7 @@ interface TimestampComment {
 }
 
 interface TrackPlayerProps {
-  r2Key: string;
+  versionId: VersionId;
   onTimestampClick?: (timestamp: number) => void;
   timestampComments?: TimestampComment[];
   seekToTime?: number | null;
@@ -22,14 +23,14 @@ interface TrackPlayerProps {
 }
 
 export function TrackPlayer({
-  r2Key,
+  versionId,
   onTimestampClick,
   timestampComments,
   seekToTime,
   onSeekComplete,
 }: TrackPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { url, loading: urlLoading } = usePresignedUrl(r2Key);
+  const { url, loading: urlLoading } = useVersionStreamUrl(versionId);
 
   const {
     isPlaying,
@@ -42,8 +43,6 @@ export function TrackPlayer({
   } = useWaveform({
     audioUrl: url || '',
     containerRef,
-    onReady: () => console.log('Waveform ready'),
-    onTimeUpdate: () => {},
   });
 
   // Keyboard shortcuts

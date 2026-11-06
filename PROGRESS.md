@@ -87,7 +87,7 @@
 - **users** — Convex Auth fields + avatarUrl, username. Indexes: email, by_username
 - **tracks** — title, description, creatorId, creatorName, visibility ("public" | "unlisted" | "private"), shareableId, latestVersionId, downloadsEnabled (optional). Indexes: by_creator, by_shareable_id, by_visibility. Search indexes: search_title (title, filterFields: visibility), search_creator (creatorName, filterFields: visibility)
 - **versions** — trackId, versionName, changeNotes, r2Key (streaming file), r2Bucket, fileName, fileSize, fileFormat, duration, uploadedBy, originalR2Key (optional - original lossless file), originalFileName (optional), originalFileSize (optional), originalFileFormat (optional). Index: by_track
-- **comments** — versionId, trackId, authorId (optional), authorName, commentText, timestamp (optional), parentCommentId (threading), attachmentR2Key, attachmentFileName, anonymousId (optional), claimedByUser (optional: true = claimed, false = permanently declined). Indexes: by_version, by_track, by_parent, by_timestamp, by_anonymous_id
+- **comments** — versionId, trackId, authorId (optional), authorName, commentText, timestamp (optional), parentCommentId (threading), attachmentR2Key, attachmentFileName, anonymousId (optional), claimedByUser (optional: true = claimed, false = permanently declined). Indexes: by_version, by_track, by_parent, by_timestamp, by_anonymous_id, by_author
 - **rateLimits** — key, timestamps (array). Index: by_key. Used for server-side rate limiting
 - **trackAccess** — trackId, userId, grantedBy, grantedAt. Indexes: by_track, by_user, by_track_and_user
 
@@ -95,16 +95,23 @@
 
 | File | Functions | Status |
 |------|-----------|--------|
-| `convex/tracks.ts` | create (w/ downloadsEnabled), getById, getPublicTracks, searchPublicTracks, getByShareableId (w/ access control), getMyTracks, updateVisibility, updateDownloadsEnabled, deleteTrack, grantAccess, revokeAccess, getCollaborators, getSharedWithMe | Done |
-| `convex/versions.ts` | create (rate-limited), getByTrack, getById, deleteVersion (w/ fallback) | Done |
-| `convex/comments.ts` | create (guest-friendly, private-track access gated, rate-limited), getByVersion, getTimestampComments (w/ includeAllVersions), getGeneralComments (w/ includeAllVersions), getReplies, deleteComment, updateComment, getAnonymousCommentsForClaiming, claimAnonymousComments (selective claim/decline) | Done |
-| `convex/migrations.ts` | migrateVisibility (one-time: isPublic → visibility) | Temporary — delete after running |
-| `convex/r2.ts` | getTrackUploadUrl, getTrackUploadUrls (dual URLs for conversion), getTrackDownloadUrl, getOriginalDownloadUrl (w/ downloads check), getAttachmentDownloadUrl, getAttachmentUploadUrl, deleteR2Objects | Done |
-| `convex/users.ts` | viewer (returns `_id` from users table), searchByEmail, getTrackParticipants, updateName (w/ denormalized creatorName propagation), checkUsernameAvailable, updateEmail, changePassword (action: verifies current password, updates credentials, invalidates other sessions), deleteAccount (w/ deletion mode: keep_comments or delete_everything) | Done |
+| `convex/tracks.ts` | create, searchPublicTracks, getByShareableId (returns `viewerRole`), updateSettings (title/description/visibility/downloads), getMyTracks, deleteTrack (cascades), grantAccess, revokeAccess, getCollaborators, getSharedWithMe | Done |
+| `convex/versions.ts` | create (rate-limited, validates R2 key prefix), getByTrack (access-checked, no storage keys), deleteVersion (cascades, re-points latestVersionId) | Done |
+| `convex/comments.ts` | listThreads (timestamped + general threads with nested replies and per-comment `canEdit`/`canDelete`), create (guest-friendly, replies attach to thread root, rate-limited), updateComment, deleteComment (cascades to replies + attachment), getAnonymousCommentsForClaiming, claimAnonymousComments (claim listed, decline rest) | Done |
+| `convex/storage.ts` | Internal queries that authorize file access and mint upload keys: versionStreamKey, versionDownloadKey, attachmentDownloadKey, newVersionKeys, newAttachmentKey | Done |
+| `convex/r2.ts` | Actions (Node): getVersionStreamUrl, getVersionDownloadUrl, getAttachmentUrl, getVersionUploadUrls, getAttachmentUploadUrl; internal deleteObjects | Done |
+| `convex/users.ts` | viewer, searchByEmail, getTrackParticipants (access-checked), updateName (propagates creatorName + comment authorName), checkUsernameAvailable, resolveLoginIdentifier, updateEmail, changePassword, deleteAccount (cascades; also removes auth sessions/accounts) | Done |
 | `convex/auth.ts` | Convex Auth with Password provider, custom profile extracts name + username on signup | Done |
 | `convex/http.ts` | Auth HTTP routes | Done |
-| `convex/lib/r2Client.ts` | S3-compatible R2 client, generateUploadUrl, generateDownloadUrl, deleteObject, deleteObjects | Done |
+| `convex/lib/access.ts` | Track access policy: readTrack/requireTrack, readVersion/requireVersion, requireUserId. Roles: owner, collaborator, guest | Done |
+| `convex/lib/cascade.ts` | cascadeDelete (track → versions → comments → replies, grants; schedules R2 purge), deleteAuthRecords | Done |
+| `convex/lib/storageKeys.ts` | randomId, versionKeys, attachmentKey, isVersionKeyFor, isAttachmentKeyFor | Done |
+| `convex/lib/r2Client.ts` | S3-compatible R2 client, generateUploadUrl, generateDownloadUrl, deleteObjects | Done |
 | `convex/lib/rateLimit.ts` | Reusable `checkRateLimit` helper — sliding window rate limiter backed by `rateLimits` table | Done |
+
+### Tests
+
+`npm test` (Vitest + convex-test, edge-runtime). `convex/access.test.ts` (visibility, guest identity, threads, storage keys), `convex/cascade.test.ts` (deletion, account deletion, claiming), `src/lib/fileTypes.test.ts`. Shared helpers in `convex/test.setup.ts`.
 
 ---
 
@@ -121,21 +128,22 @@
 | Toast notifications | `sonner` in `src/App.tsx` | Dark-themed toaster, bottom-right, used across all mutation/action feedback |
 | Error boundaries | `react-error-boundary` in `src/App.tsx`, `src/pages/TrackPage.tsx` | Global + player-specific boundaries with themed fallbacks |
 | OG meta tags | `index.html` | Static OG/Twitter Card tags, description, theme-color, placeholder image |
-| Utility functions | `src/lib/utils.ts` | cn, formatDuration, formatFileSize, validateAudioFile, validateAttachmentFile, getAttachmentType, generateShareableLink, formatRelativeTime, getRecordingMimeType, mimeToExtension |
+| Utility functions | `src/lib/utils.ts` | cn, formatDuration, formatFileSize, generateShareableLink, formatRelativeTime, getRecordingMimeType, mimeToExtension |
+| File-type registry | `src/lib/fileTypes.ts` | validateUpload(file, 'track' \| 'attachment'), acceptAttribute, attachmentKind, isLossless, extensionOf |
+| R2 upload | `src/lib/r2Upload.ts` | putToSignedUrl — XHR PUT with progress |
 | Anonymous user utils | `src/lib/anonymousUser.ts` | generateAnonymousName, generateAnonymousId, getAnonymousIdentity (localStorage persistence) |
 | Optimistic updates | `src/lib/optimisticUpdates.ts` | `commentCreateOptimistic` — patches local query cache for instant comment appearance |
-| Type definitions | `src/types/index.ts` | Track, Version, Comment, User type exports |
+| Type definitions | `src/types/index.ts` | Track, TrackForViewer, Version (client view), CommentThread, CommentView, id types |
 
 ### Hooks
 
 | Hook | Location | Purpose |
 |------|----------|---------|
 | `useWaveform` | `src/hooks/useWaveform.ts` | WaveSurfer.js lifecycle — play/pause, seek, volume, speed, cleanup |
-| `usePresignedUrl` | `src/hooks/usePresignedUrl.ts` | Fetches + caches R2 download URLs (55-min cache) |
+| `useVersionStreamUrl`, `useAttachmentUrl` | `src/hooks/useSignedUrl.ts` | Signed GET URLs by versionId / commentId, one shared 55-min cache |
 | `useFileUpload` | `src/hooks/useFileUpload.ts` | Full upload pipeline: validate → convert lossless (WAV/FLAC) to MP3 via ffmpeg.wasm → dual presigned URLs → XHR to R2 → save metadata. Exposes `stage` (idle/converting/uploading) for progress UI |
 | `useAudioDuration` | `src/hooks/useAudioDuration.ts` | Extract duration from audio File via HTML5 Audio API |
-| `useAttachmentUpload` | `src/hooks/useAttachmentUpload.ts` | Attachment upload: validate → presigned URL → XHR to R2 with progress |
-| `useAttachmentUrl` | `src/hooks/useAttachmentUrl.ts` | Fetches + caches R2 attachment download URLs (55-min cache) for inline previews |
+| `useAttachmentUpload` | `src/hooks/useAttachmentUpload.ts` | Attachment upload for a track: validate → presigned URL → XHR to R2 with progress |
 | `useKeyboardShortcuts` | `src/hooks/useKeyboardShortcuts.ts` | Spacebar play/pause, arrow key seeking (±5s), input-aware |
 | `useDebounce` | `src/hooks/useDebounce.ts` | Generic debounce hook for search input |
 | `useAnonymousIdentity` | `src/hooks/useAnonymousIdentity.ts` | Persistent anonymous identity (funny names like "sneaky-owl") from localStorage |
@@ -175,7 +183,7 @@
 | CommentForm | `src/components/comments/CommentForm.tsx` | Done — text input, optional timestamp, file attachment, audio recording, @mention support |
 | CommentItem | `src/components/comments/CommentItem.tsx` | Done — display, edit, delete, reply, timestamp click, inline attachment previews (image thumbnail + lightbox, audio player), download, mention highlighting, anonymous user edit/delete authorization |
 | ImageLightbox | `src/components/comments/ImageLightbox.tsx` | Done — fullscreen image viewer with download button, ESC/backdrop close |
-| CommentList | `src/components/comments/CommentList.tsx` | Done — renders top-level comments |
+| CommentList | `src/components/comments/CommentList.tsx` | Done — renders threads from `listThreads` |
 | TimestampMarker | `src/components/comments/TimestampMarker.tsx` | Done — waveform overlay markers |
 | MentionInput | `src/components/comments/MentionInput.tsx` | Done — textarea with @mention autocomplete dropdown |
 | AudioRecordingModal | `src/components/comments/AudioRecordingModal.tsx` | Done — record voice feedback via browser mic, preview, attach to comment |
@@ -194,9 +202,10 @@ All routes wired: `/`, `/login`, `/track/:shareableId`, `/upload`, `/profile`, `
 - **Convex mutations**: `useMutation(api.xxx)` returns async function. Comment creation uses `.withOptimisticUpdate()` for instant UI feedback
 - **Convex actions**: `useAction(api.xxx)` for R2 presigned URLs (server-side, non-reactive)
 - **Auth check**: `useQuery(api.users.viewer)` — null if not logged in, undefined while loading
-- **Ownership check**: Compare `viewer._id` with `track.creatorId` (both are `Id<"users">`)
-- **R2 upload flow**: Get presigned PUT URL → XHR upload → save metadata via mutation
-- **R2 playback flow**: Get presigned GET URL (1hr cache) → pass to WaveSurfer
+- **Access control**: server-side only, via `convex/lib/access.ts`. Client reads `track.viewerRole` and per-comment `canEdit`/`canDelete`
+- **Deletion**: always `cascadeDelete` from `convex/lib/cascade.ts`
+- **R2 upload flow**: `r2.getVersionUploadUrls` / `r2.getAttachmentUploadUrl` (server mints key) → `putToSignedUrl` → save key via mutation (server checks key prefix)
+- **R2 playback flow**: `useVersionStreamUrl(versionId)` (1hr URL, 55-min cache) → WaveSurfer
 - **Attachment flow**: Select file → validate → upload to R2 → store r2Key in comment. Display: images show inline thumbnail (click for fullscreen lightbox), audio plays via `<audio>` element, others show download link
 - **WaveSurfer**: Initialize in useEffect, destroy in cleanup. Never leak instances.
 - **Styling**: Tailwind with `studio.*` custom colors, `.card`/`.input` base classes, dark mode default
@@ -210,4 +219,5 @@ All routes wired: `/`, `/login`, `/track/:shareableId`, `/upload`, `/profile`, `
 - Collaborator roles (viewer/commenter/editor — only basic access grant/revoke exists)
 
 **Tooling:**
+- ~~Tests~~ — Done (Vitest + convex-test, `npm test`)
 - ~~ESLint configuration~~ — Done (`.eslintrc.cjs`, `.eslintignore`)

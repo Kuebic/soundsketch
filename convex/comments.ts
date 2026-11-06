@@ -1,16 +1,146 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { checkRateLimit } from "./lib/rateLimit";
+import { readVersion, requireTrack, requireUserId, type TrackRole } from "./lib/access";
+import { cascadeDelete } from "./lib/cascade";
+import { isAttachmentKeyFor } from "./lib/storageKeys";
+
+const MAX_COMMENT_LENGTH = 5000;
+const MAX_GUEST_NAME_LENGTH = 50;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Create a new comment (timestamp or general)
+ * Who is acting on a comment: a signed-in user, or a guest identified by the
+ * browser-generated anonymousId they hold in localStorage.
+ */
+interface Commenter {
+  userId: Id<"users"> | null;
+  anonymousId: string | null;
+}
+
+async function resolveCommenter(ctx: QueryCtx, anonymousId?: string): Promise<Commenter> {
+  const userId = await getAuthUserId(ctx);
+  if (userId) return { userId, anonymousId: null };
+  return { userId: null, anonymousId: anonymousId && UUID_RE.test(anonymousId) ? anonymousId : null };
+}
+
+function isAuthor(comment: Doc<"comments">, who: Commenter): boolean {
+  if (who.userId) return comment.authorId === who.userId;
+  return !comment.authorId && !!who.anonymousId && comment.anonymousId === who.anonymousId;
+}
+
+/** Comment as sent to clients: no storage key, no anonymousId, permissions attached. */
+export interface CommentView {
+  _id: Id<"comments">;
+  _creationTime: number;
+  versionId: Id<"versions">;
+  authorId?: Id<"users">;
+  authorName: string;
+  commentText: string;
+  timestamp?: number;
+  parentCommentId?: Id<"comments">;
+  attachmentFileName?: string;
+  hasAttachment: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+}
+
+export interface CommentThread extends CommentView {
+  replies: CommentView[];
+}
+
+function toView(comment: Doc<"comments">, who: Commenter, role: TrackRole): CommentView {
+  const author = isAuthor(comment, who);
+  return {
+    _id: comment._id,
+    _creationTime: comment._creationTime,
+    versionId: comment.versionId,
+    authorId: comment.authorId,
+    authorName: comment.authorName,
+    commentText: comment.commentText,
+    timestamp: comment.timestamp,
+    parentCommentId: comment.parentCommentId,
+    attachmentFileName: comment.attachmentFileName,
+    hasAttachment: !!comment.attachmentR2Key,
+    canEdit: author,
+    canDelete: author || role === "owner",
+  };
+}
+
+function cleanText(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error("Comment cannot be empty");
+  if (trimmed.length > MAX_COMMENT_LENGTH) {
+    throw new Error(`Comment must be ${MAX_COMMENT_LENGTH} characters or fewer`);
+  }
+  return trimmed;
+}
+
+function cleanTimestamp(timestamp: number): number {
+  if (!Number.isFinite(timestamp) || timestamp < 0) throw new Error("Invalid timestamp");
+  return timestamp;
+}
+
+/**
+ * All comment threads for a version (or for every version of its track),
+ * split into timestamped feedback (sorted by position) and general discussion
+ * (sorted by time). Replies are nested under their thread.
+ */
+export const listThreads = query({
+  args: {
+    versionId: v.id("versions"),
+    includeAllVersions: v.optional(v.boolean()),
+    anonymousId: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<{ timestamped: CommentThread[]; general: CommentThread[] }> => {
+    const access = await readVersion(ctx, args.versionId);
+    if (!access) return { timestamped: [], general: [] };
+    const who = await resolveCommenter(ctx, args.anonymousId);
+
+    const comments = args.includeAllVersions
+      ? await ctx.db
+          .query("comments")
+          .withIndex("by_track", (q) => q.eq("trackId", access.track._id))
+          .collect()
+      : await ctx.db
+          .query("comments")
+          .withIndex("by_version", (q) => q.eq("versionId", args.versionId))
+          .collect();
+
+    const threads = await Promise.all(
+      comments
+        .filter((c) => !c.parentCommentId)
+        .map(async (root): Promise<CommentThread> => {
+          const replies = await ctx.db
+            .query("comments")
+            .withIndex("by_parent", (q) => q.eq("parentCommentId", root._id))
+            .collect();
+          return {
+            ...toView(root, who, access.role),
+            replies: replies.map((r) => toView(r, who, access.role)),
+          };
+        }),
+    );
+
+    return {
+      timestamped: threads
+        .filter((t) => t.timestamp !== undefined)
+        .sort((a, b) => a.timestamp! - b.timestamp!),
+      general: threads.filter((t) => t.timestamp === undefined),
+    };
+  },
+});
+
+/**
+ * Post a comment, timestamped comment, or reply. Guests may comment on
+ * public/unlisted tracks; private tracks need owner or collaborator access.
+ * Replies always attach to the thread root, on the root's version.
  */
 export const create = mutation({
   args: {
     versionId: v.id("versions"),
-    trackId: v.id("tracks"),
     commentText: v.string(),
     timestamp: v.optional(v.number()),
     parentCommentId: v.optional(v.id("comments")),
@@ -20,216 +150,54 @@ export const create = mutation({
     anonymousName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Allow guest comments on public/unlisted tracks
-    const userId = await getAuthUserId(ctx);
-    let authorId: Id<"users"> | undefined;
+    const version = await ctx.db.get(args.versionId);
+    if (!version) throw new Error("Version not found");
+    const { track } = await requireTrack(ctx, version.trackId);
+    const who = await resolveCommenter(ctx, args.anonymousId);
+
+    let versionId = version._id;
+    let parentCommentId: Id<"comments"> | undefined;
+    let timestamp = args.timestamp === undefined ? undefined : cleanTimestamp(args.timestamp);
+    if (args.parentCommentId) {
+      const parent = await ctx.db.get(args.parentCommentId);
+      if (!parent || parent.trackId !== track._id) throw new Error("Comment not found");
+      const root = parent.parentCommentId ? await ctx.db.get(parent.parentCommentId) : parent;
+      if (!root) throw new Error("Comment not found");
+      parentCommentId = root._id;
+      versionId = root.versionId;
+      timestamp = undefined;
+    }
+
+    if (args.attachmentR2Key && !isAttachmentKeyFor(track._id, args.attachmentR2Key)) {
+      throw new Error("Invalid attachment");
+    }
+
     let authorName = "Anonymous";
-    let anonymousId: string | undefined;
-
-    if (userId) {
-      const user = await ctx.db.get(userId);
-      if (user) {
-        authorId = user._id;
-        authorName = user.name ?? "Anonymous";
-      }
-      // No anonymousId for authenticated users
+    if (who.userId) {
+      const user = await ctx.db.get(who.userId);
+      authorName = user?.name ?? "Anonymous";
+      await checkRateLimit(ctx, `comment:${who.userId}`, 10, 60_000);
     } else {
-      // Guest: use provided anonymous info
-      anonymousId = args.anonymousId;
-      authorName = args.anonymousName ?? "Anonymous";
+      authorName = args.anonymousName?.trim().slice(0, MAX_GUEST_NAME_LENGTH) || "Anonymous";
+      await checkRateLimit(ctx, `comment:guest:${track._id}`, 5, 60_000);
     }
 
-    // Private tracks require authentication + creator/collaborator access
-    const track = await ctx.db.get(args.trackId);
-    if (!track) throw new Error("Track not found");
-
-    if (track.visibility === "private") {
-      if (!userId) throw new Error("Authentication required to comment on private tracks");
-      const isCreator = track.creatorId === userId;
-      const hasAccess = await ctx.db
-        .query("trackAccess")
-        .withIndex("by_track_and_user", (q) =>
-          q.eq("trackId", args.trackId).eq("userId", userId)
-        )
-        .first();
-      if (!isCreator && !hasAccess) {
-        throw new Error("Not authorized to comment on this track");
-      }
-    }
-
-    // Rate limit: 10/min for authenticated users, 5/min per track for guests
-    if (userId) {
-      await checkRateLimit(ctx, `comment:${userId}`, 10, 60_000);
-    } else {
-      await checkRateLimit(ctx, `comment:guest:${args.trackId}`, 5, 60_000);
-    }
-
-    const commentId = await ctx.db.insert("comments", {
-      versionId: args.versionId,
-      trackId: args.trackId,
-      authorId,
+    return ctx.db.insert("comments", {
+      versionId,
+      trackId: track._id,
+      authorId: who.userId ?? undefined,
       authorName,
-      commentText: args.commentText,
-      timestamp: args.timestamp,
-      parentCommentId: args.parentCommentId,
+      commentText: cleanText(args.commentText),
+      timestamp,
+      parentCommentId,
       attachmentR2Key: args.attachmentR2Key,
-      attachmentFileName: args.attachmentFileName,
-      anonymousId,
+      attachmentFileName: args.attachmentR2Key ? args.attachmentFileName : undefined,
+      anonymousId: who.anonymousId ?? undefined,
     });
-
-    return commentId;
   },
 });
 
-/**
- * Get all comments for a version (with option to include all versions)
- */
-export const getByVersion = query({
-  args: {
-    versionId: v.id("versions"),
-    includeAllVersions: v.optional(v.boolean()),
-  },
-  handler: async (ctx, args) => {
-    if (args.includeAllVersions) {
-      // Get version to find trackId
-      const version = await ctx.db.get(args.versionId);
-      if (!version) return [];
-
-      return ctx.db
-        .query("comments")
-        .withIndex("by_track", (q) => q.eq("trackId", version.trackId))
-        .collect();
-    }
-
-    return ctx.db
-      .query("comments")
-      .withIndex("by_version", (q) => q.eq("versionId", args.versionId))
-      .collect();
-  },
-});
-
-/**
- * Get timestamp comments for a version (sorted by timestamp)
- */
-export const getTimestampComments = query({
-  args: {
-    versionId: v.id("versions"),
-    includeAllVersions: v.optional(v.boolean()),
-  },
-  handler: async (ctx, args) => {
-    let comments;
-    if (args.includeAllVersions) {
-      const version = await ctx.db.get(args.versionId);
-      if (!version) return [];
-      comments = await ctx.db
-        .query("comments")
-        .withIndex("by_track", (q) => q.eq("trackId", version.trackId))
-        .collect();
-    } else {
-      comments = await ctx.db
-        .query("comments")
-        .withIndex("by_version", (q) => q.eq("versionId", args.versionId))
-        .collect();
-    }
-
-    return comments
-      .filter((c) => c.timestamp !== undefined)
-      .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-  },
-});
-
-/**
- * Get general comments for a version (no timestamp)
- */
-export const getGeneralComments = query({
-  args: {
-    versionId: v.id("versions"),
-    includeAllVersions: v.optional(v.boolean()),
-  },
-  handler: async (ctx, args) => {
-    let comments;
-    if (args.includeAllVersions) {
-      const version = await ctx.db.get(args.versionId);
-      if (!version) return [];
-      comments = await ctx.db
-        .query("comments")
-        .withIndex("by_track", (q) => q.eq("trackId", version.trackId))
-        .collect();
-    } else {
-      comments = await ctx.db
-        .query("comments")
-        .withIndex("by_version", (q) => q.eq("versionId", args.versionId))
-        .collect();
-    }
-
-    return comments.filter((c) => c.timestamp === undefined);
-  },
-});
-
-/**
- * Get replies to a comment
- */
-export const getReplies = query({
-  args: { parentCommentId: v.id("comments") },
-  handler: async (ctx, args) => {
-    return ctx.db
-      .query("comments")
-      .withIndex("by_parent", (q) => q.eq("parentCommentId", args.parentCommentId))
-      .collect();
-  },
-});
-
-/**
- * Get the count of replies to a comment
- */
-export const getReplyCount = query({
-  args: { parentCommentId: v.id("comments") },
-  handler: async (ctx, args) => {
-    const replies = await ctx.db
-      .query("comments")
-      .withIndex("by_parent", (q) => q.eq("parentCommentId", args.parentCommentId))
-      .collect();
-    return replies.length;
-  },
-});
-
-/**
- * Delete a comment
- */
-export const deleteComment = mutation({
-  args: {
-    commentId: v.id("comments"),
-    anonymousId: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-
-    const comment = await ctx.db.get(args.commentId);
-    if (!comment) throw new Error("Comment not found");
-
-    // Check if user is comment author or track owner
-    const track = await ctx.db.get(comment.trackId);
-    const isTrackOwner = userId && track?.creatorId === userId;
-
-    // Check authorization
-    let isAuthor = false;
-    if (userId) {
-      isAuthor = comment.authorId === userId;
-    } else if (args.anonymousId && comment.anonymousId) {
-      isAuthor = comment.anonymousId === args.anonymousId;
-    }
-
-    if (!isAuthor && !isTrackOwner) {
-      throw new Error("Not authorized");
-    }
-
-    await ctx.db.delete(args.commentId);
-  },
-});
-
-/**
- * Update a comment
- */
+/** Edit a comment's text (and position, for timestamped comments). Author only. */
 export const updateComment = mutation({
   args: {
     commentId: v.id("comments"),
@@ -238,59 +206,59 @@ export const updateComment = mutation({
     anonymousId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
     const comment = await ctx.db.get(args.commentId);
     if (!comment) throw new Error("Comment not found");
-
-    // Authorization check
-    if (userId) {
-      // Logged in: must be comment author
-      if (comment.authorId !== userId) {
-        throw new Error("Not authorized");
-      }
-    } else {
-      // Guest: must match anonymousId AND comment must have anonymousId
-      if (!comment.anonymousId || comment.anonymousId !== args.anonymousId) {
-        throw new Error("Not authorized");
-      }
+    if (!isAuthor(comment, await resolveCommenter(ctx, args.anonymousId))) {
+      throw new Error("Not authorized");
     }
 
     await ctx.db.patch(args.commentId, {
-      commentText: args.commentText,
-      ...(args.timestamp !== undefined && { timestamp: args.timestamp }),
+      commentText: cleanText(args.commentText),
+      ...(args.timestamp !== undefined &&
+        comment.timestamp !== undefined && { timestamp: cleanTimestamp(args.timestamp) }),
     });
   },
 });
 
-/**
- * Get anonymous comments that can be claimed by an authenticated user.
- * Used to display the claim prompt modal after login/signup.
- */
-export const getAnonymousCommentsForClaiming = query({
+/** Delete a comment, its replies and attachments. Author or track owner. */
+export const deleteComment = mutation({
   args: {
-    anonymousId: v.string(),
+    commentId: v.id("comments"),
+    anonymousId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Validate UUID format
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(args.anonymousId)) {
-      return [];
-    }
+    const comment = await ctx.db.get(args.commentId);
+    if (!comment) throw new Error("Comment not found");
 
-    const comments = await ctx.db
-      .query("comments")
-      .withIndex("by_anonymous_id", (q) => q.eq("anonymousId", args.anonymousId))
-      .collect();
+    const who = await resolveCommenter(ctx, args.anonymousId);
+    const track = await ctx.db.get(comment.trackId);
+    const isTrackOwner = !!who.userId && track?.creatorId === who.userId;
+    if (!isAuthor(comment, who) && !isTrackOwner) throw new Error("Not authorized");
 
-    // Filter to only claimable comments (no authorId, not previously declined)
-    const claimable = comments.filter(
-      (c) => !c.authorId && c.claimedByUser !== false
-    );
+    await cascadeDelete(ctx, [{ kind: "comment", id: comment._id }]);
+  },
+});
 
-    // Join with track data for display
-    const commentsWithTrack = await Promise.all(
-      claimable.map(async (comment) => {
+async function claimableComments(ctx: QueryCtx, anonymousId: string) {
+  if (!UUID_RE.test(anonymousId)) return [];
+  const comments = await ctx.db
+    .query("comments")
+    .withIndex("by_anonymous_id", (q) => q.eq("anonymousId", anonymousId))
+    .collect();
+  // Not yet claimed by anyone, and not permanently declined
+  return comments.filter((c) => !c.authorId && c.claimedByUser !== false);
+}
+
+/**
+ * Guest comments that a newly signed-in user can claim as their own.
+ * Used to display the claim prompt after login/signup.
+ */
+export const getAnonymousCommentsForClaiming = query({
+  args: { anonymousId: v.string() },
+  handler: async (ctx, args) => {
+    const comments = await claimableComments(ctx, args.anonymousId);
+    return Promise.all(
+      comments.map(async (comment) => {
         const track = await ctx.db.get(comment.trackId);
         return {
           _id: comment._id,
@@ -302,96 +270,42 @@ export const getAnonymousCommentsForClaiming = query({
           timestamp: comment.timestamp,
           _creationTime: comment._creationTime,
         };
-      })
+      }),
     );
-
-    return commentsWithTrack;
   },
 });
 
 /**
- * Claim anonymous comments for the current authenticated user.
- * Supports selective claiming - only specified comments are claimed, rest are declined.
+ * Claim the listed guest comments for the signed-in user; every other
+ * claimable comment for this anonymousId is permanently declined.
  */
 export const claimAnonymousComments = mutation({
   args: {
     anonymousId: v.string(),
-    commentIds: v.optional(v.array(v.id("comments"))), // specific comments to claim
-    declineAll: v.optional(v.boolean()), // mark all as permanently declined
+    commentIds: v.array(v.id("comments")),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Must be authenticated to claim comments");
-    }
-
-    // Validate UUID format
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(args.anonymousId)) {
-      throw new Error("Invalid anonymousId format");
-    }
-
+    const userId = await requireUserId(ctx);
+    if (!UUID_RE.test(args.anonymousId)) throw new Error("Invalid anonymousId format");
     const user = await ctx.db.get(userId);
-    if (!user) {
-      throw new Error("User not found");
-    }
-    const authorName = user.name ?? "Anonymous";
+    if (!user) throw new Error("User not found");
 
-    // Find all comments with this anonymousId
-    const allComments = await ctx.db
-      .query("comments")
-      .withIndex("by_anonymous_id", (q) => q.eq("anonymousId", args.anonymousId))
-      .collect();
-
-    // Filter to only unclaimed comments that haven't been previously declined
-    const unclaimedComments = allComments.filter(
-      (c) => !c.authorId && c.claimedByUser !== false
-    );
-
+    const claim = new Set<string>(args.commentIds);
     let claimedCount = 0;
     let declinedCount = 0;
 
-    if (args.declineAll) {
-      // Mark all as permanently declined
-      for (const comment of unclaimedComments) {
-        await ctx.db.patch(comment._id, {
-          claimedByUser: false,
-        });
-        declinedCount++;
-      }
-    } else if (args.commentIds && args.commentIds.length > 0) {
-      // Claim specific comments, decline the rest
-      const claimSet = new Set(args.commentIds.map((id) => id.toString()));
-
-      for (const comment of unclaimedComments) {
-        if (claimSet.has(comment._id.toString())) {
-          // Claim this comment
-          await ctx.db.patch(comment._id, {
-            authorId: userId,
-            authorName: authorName,
-            anonymousId: undefined,
-            claimedByUser: true,
-          });
-          claimedCount++;
-        } else {
-          // Decline this comment
-          await ctx.db.patch(comment._id, {
-            claimedByUser: false,
-          });
-          declinedCount++;
-        }
-      }
-    } else {
-      // Legacy behavior: claim all (for backward compatibility)
-      for (const comment of unclaimedComments) {
+    for (const comment of await claimableComments(ctx, args.anonymousId)) {
+      if (claim.has(comment._id)) {
         await ctx.db.patch(comment._id, {
           authorId: userId,
-          authorName: authorName,
+          authorName: user.name ?? "Anonymous",
           anonymousId: undefined,
           claimedByUser: true,
         });
         claimedCount++;
+      } else {
+        await ctx.db.patch(comment._id, { claimedByUser: false });
+        declinedCount++;
       }
     }
 

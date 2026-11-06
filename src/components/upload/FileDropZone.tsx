@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Upload, X, FileAudio } from 'lucide-react';
-import { validateAudioFile, formatFileSize } from '@/lib/utils';
+import { formatFileSize } from '@/lib/utils';
+import { acceptAttribute, validateUpload } from '@/lib/fileTypes';
 
 interface FileDropZoneProps {
   file: File | null;
@@ -15,9 +16,9 @@ export function FileDropZone({ file, onFileSelect, onFileClear, error }: FileDro
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const handleFile = (f: File) => {
-    const result = validateAudioFile(f);
-    if (!result.valid) {
-      setValidationError(result.error || 'Invalid file');
+    const invalid = validateUpload(f, 'track');
+    if (invalid) {
+      setValidationError(invalid);
       return;
     }
     setValidationError(null);
@@ -85,7 +86,7 @@ export function FileDropZone({ file, onFileSelect, onFileClear, error }: FileDro
       <input
         ref={inputRef}
         type="file"
-        accept=".mp3,.wav,.flac,.m4a,.aac,.ogg"
+        accept={acceptAttribute('track')}
         onChange={handleChange}
         className="hidden"
       />

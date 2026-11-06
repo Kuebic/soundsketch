@@ -97,11 +97,3 @@ export async function convertToMp3(
   const mp3FileName = file.name.replace(/\.(wav|flac)$/i, '.mp3');
   return new File([view], mp3FileName, { type: 'audio/mpeg' });
 }
-
-/**
- * Check if a file is a lossless format that should be converted
- */
-export function isLosslessFormat(fileName: string): boolean {
-  const ext = fileName.split('.').pop()?.toLowerCase();
-  return ext === 'wav' || ext === 'flac';
-}

@@ -2,19 +2,17 @@ import { useState } from 'react';
 import { useMutation, useAction } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAudioDuration } from './useAudioDuration';
-import { validateAudioFile } from '@/lib/utils';
-import {
-  convertToMp3,
-  isLosslessFormat,
-  isConversionSupported,
-} from '@/lib/audioConverter';
-import type { Id } from '../../convex/_generated/dataModel';
+import { extensionOf, isLossless, validateUpload } from '@/lib/fileTypes';
+import { convertToMp3, isConversionSupported } from '@/lib/audioConverter';
+import { putToSignedUrl } from '@/lib/r2Upload';
+import type { TrackId } from '@/types';
 
 export type UploadStage = 'idle' | 'converting' | 'uploading';
 
 /**
- * Hook for uploading audio files to R2 with progress tracking
- * Converts lossless audio (WAV/FLAC) to MP3 320kbps for streaming
+ * Hook for uploading a new track version to R2 with progress tracking.
+ * Lossless audio (WAV/FLAC) is converted to MP3 320kbps for streaming and
+ * the original is uploaded alongside it for download.
  */
 export function useFileUpload() {
   const [uploading, setUploading] = useState(false);
@@ -22,13 +20,13 @@ export function useFileUpload() {
   const [stage, setStage] = useState<UploadStage>('idle');
   const [error, setError] = useState<string | null>(null);
 
-  const getUploadUrls = useAction(api.r2.getTrackUploadUrls);
+  const getUploadUrls = useAction(api.r2.getVersionUploadUrls);
   const createVersion = useMutation(api.versions.create);
   const { getDuration } = useAudioDuration();
 
   const uploadFile = async (
     file: File,
-    trackId: Id<'tracks'>,
+    trackId: TrackId,
     versionName: string,
     changeNotes?: string
   ) => {
@@ -38,16 +36,12 @@ export function useFileUpload() {
       setStage('idle');
       setError(null);
 
-      // Validate file
-      const validation = validateAudioFile(file);
-      if (!validation.valid) {
-        throw new Error(validation.error);
-      }
+      const invalid = validateUpload(file, 'track');
+      if (invalid) throw new Error(invalid);
 
-      const needsConversion = isLosslessFormat(file.name);
+      const needsConversion = isLossless(file.name);
       let streamingFile = file;
 
-      // Convert lossless to MP3 for streaming
       if (needsConversion) {
         if (!isConversionSupported()) {
           throw new Error(
@@ -62,79 +56,42 @@ export function useFileUpload() {
         });
       }
 
-      // Get audio duration from streaming file
       const duration = await getDuration(streamingFile);
+      const urls = await getUploadUrls({ trackId, fileName: file.name, needsConversion });
 
-      // Get presigned URLs for both files
-      const urls = await getUploadUrls({
-        fileName: file.name,
-        fileType: file.type,
-        trackId,
-        versionName,
-        needsConversion,
-      });
-
+      // Progress split: no conversion → upload is 0-100%;
+      // conversion → streaming 30-65%, original 65-100%.
       setStage('uploading');
+      await Promise.all([
+        putToSignedUrl(urls.streaming.url, streamingFile, (p) =>
+          setProgress(needsConversion ? 30 + Math.round(p * 0.35) : Math.round(p))
+        ),
+        urls.original &&
+          putToSignedUrl(urls.original.url, file, (p) => setProgress(65 + Math.round(p * 0.35))),
+      ]);
 
-      // Upload files in parallel
-      const uploadPromises: Promise<void>[] = [];
-
-      // Upload streaming file (always)
-      uploadPromises.push(
-        uploadToR2(urls.streamingUploadUrl, streamingFile, (p) => {
-          if (needsConversion) {
-            // Streaming upload is 30-65% of total (35% weight)
-            setProgress(30 + Math.round((p * 35) / 100));
-          } else {
-            // No conversion: upload is 100% of progress
-            setProgress(Math.round(p));
-          }
-        })
-      );
-
-      // Upload original file (only for lossless)
-      if (needsConversion && urls.originalUploadUrl) {
-        uploadPromises.push(
-          uploadToR2(urls.originalUploadUrl, file, (p) => {
-            // Original upload is 65-100% of total (35% weight)
-            setProgress(65 + Math.round((p * 35) / 100));
-          })
-        );
-      }
-
-      await Promise.all(uploadPromises);
-
-      // Save metadata to Convex
-      const streamingExtension = needsConversion
-        ? 'mp3'
-        : file.name.split('.').pop()?.toLowerCase() || 'mp3';
-
-      const versionId = await createVersion({
+      return await createVersion({
         trackId,
         versionName,
         changeNotes,
-        r2Key: urls.streamingR2Key,
+        r2Key: urls.streaming.r2Key,
         fileName: streamingFile.name,
         fileSize: streamingFile.size,
-        fileFormat: streamingExtension,
+        fileFormat: extensionOf(streamingFile.name) || 'mp3',
         duration,
-        // Original file metadata (only for lossless)
-        originalR2Key: urls.originalR2Key,
-        originalFileName: needsConversion ? file.name : undefined,
-        originalFileSize: needsConversion ? file.size : undefined,
-        originalFileFormat: needsConversion
-          ? file.name.split('.').pop()?.toLowerCase()
-          : undefined,
+        ...(urls.original && {
+          originalR2Key: urls.original.r2Key,
+          originalFileName: file.name,
+          originalFileSize: file.size,
+          originalFileFormat: extensionOf(file.name),
+        }),
       });
-
-      setUploading(false);
-      setStage('idle');
-      return versionId;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
+      throw err;
+    } finally {
       setUploading(false);
       setStage('idle');
-      throw err;
     }
   };
 
@@ -145,39 +102,4 @@ export function useFileUpload() {
     stage,
     error,
   };
-}
-
-/**
- * Upload a file to R2 using XMLHttpRequest with progress tracking
- */
-async function uploadToR2(
-  url: string,
-  file: File,
-  onProgress: (percent: number) => void
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-
-    xhr.upload.addEventListener('progress', (e) => {
-      if (e.lengthComputable) {
-        onProgress((e.loaded / e.total) * 100);
-      }
-    });
-
-    xhr.addEventListener('load', () => {
-      if (xhr.status === 200) {
-        resolve();
-      } else {
-        reject(new Error(`Upload failed: ${xhr.statusText}`));
-      }
-    });
-
-    xhr.addEventListener('error', () => {
-      reject(new Error('Upload failed'));
-    });
-
-    xhr.open('PUT', url);
-    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-    xhr.send(file);
-  });
 }

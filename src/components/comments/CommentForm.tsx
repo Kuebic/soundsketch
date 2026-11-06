@@ -7,7 +7,8 @@ import { MentionInput } from './MentionInput';
 import { useAttachmentUpload } from '@/hooks/useAttachmentUpload';
 import { useAnonymousIdentity } from '@/hooks/useAnonymousIdentity';
 import { commentCreateOptimistic } from '@/lib/optimisticUpdates';
-import { formatDuration, formatFileSize, validateAttachmentFile, getAttachmentType } from '@/lib/utils';
+import { formatDuration, formatFileSize } from '@/lib/utils';
+import { acceptAttribute, attachmentKind, validateUpload } from '@/lib/fileTypes';
 import { Send, X, Clock, Paperclip, FileAudio, Image, FileText, File, Loader2, Mic } from 'lucide-react';
 import { AudioRecordingModal } from './AudioRecordingModal';
 import type { TrackId, VersionId, CommentId } from '@/types';
@@ -58,15 +59,15 @@ export function CommentForm({
       ),
   );
   const participants = useQuery(api.users.getTrackParticipants, { trackId });
-  const { uploadAttachment, uploading, progress, error: uploadError } = useAttachmentUpload();
+  const { uploadAttachment, uploading, progress, error: uploadError } = useAttachmentUpload(trackId);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const validation = validateAttachmentFile(file);
-    if (!validation.valid) {
-      setError(validation.error ?? 'Invalid file');
+    const invalid = validateUpload(file, 'attachment');
+    if (invalid) {
+      setError(invalid);
       return;
     }
 
@@ -102,7 +103,6 @@ export function CommentForm({
 
       await createComment({
         versionId,
-        trackId,
         commentText,
         timestamp,
         parentCommentId,
@@ -122,7 +122,7 @@ export function CommentForm({
   };
 
   const AttachmentIcon = attachmentFile
-    ? attachmentTypeIcons[getAttachmentType(attachmentFile.name)]
+    ? attachmentTypeIcons[attachmentKind(attachmentFile.name)]
     : File;
 
   return (
@@ -200,7 +200,7 @@ export function CommentForm({
         ref={fileInputRef}
         type="file"
         onChange={handleFileSelect}
-        accept=".mp3,.wav,.flac,.m4a,.aac,.ogg,.png,.jpg,.jpeg,.gif,.webp,.pdf,.txt"
+        accept={acceptAttribute('attachment')}
         className="hidden"
       />
 

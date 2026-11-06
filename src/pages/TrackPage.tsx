@@ -39,13 +39,11 @@ export function TrackPage() {
     api.versions.getByTrack,
     track ? { trackId: track._id } : 'skip'
   );
-  const timestampComments = useQuery(
-    api.comments.getTimestampComments,
-    selectedVersionId ? { versionId: selectedVersionId, includeAllVersions: showAllVersions } : 'skip'
-  );
-  const generalComments = useQuery(
-    api.comments.getGeneralComments,
-    selectedVersionId ? { versionId: selectedVersionId, includeAllVersions: showAllVersions } : 'skip'
+  const threads = useQuery(
+    api.comments.listThreads,
+    selectedVersionId
+      ? { versionId: selectedVersionId, includeAllVersions: showAllVersions, anonymousId: anonymousIdentity.id }
+      : 'skip'
   );
 
   // Set initial selected version when versions load
@@ -60,11 +58,11 @@ export function TrackPage() {
     setSelectedVersionId(null);
   }, [shareableId]);
 
-  const isOwner = viewer && track ? viewer._id === track.creatorId : false;
+  const isOwner = track?.viewerRole === 'owner';
   const selectedVersion = versions?.find((v) => v._id === selectedVersionId);
 
   // Build timestamp markers for the player
-  const playerTimestampComments = timestampComments?.map((c) => ({
+  const playerTimestampComments = threads?.timestamped.map((c) => ({
     id: c._id,
     timestamp: c.timestamp!,
     authorName: c.authorName,
@@ -139,7 +137,7 @@ export function TrackPage() {
                 onVersionChange={setSelectedVersionId}
               />
               <div className="flex items-center gap-2 self-start">
-                {track.downloadsEnabled && selectedVersionId && (
+                {(track.downloadsEnabled || isOwner) && selectedVersionId && (
                   <DownloadButton versionId={selectedVersionId} />
                 )}
                 {isOwner && (
@@ -170,10 +168,10 @@ export function TrackPage() {
           <div className="mb-8">
             <ErrorBoundary
               FallbackComponent={PlayerErrorFallback}
-              resetKeys={[selectedVersion.r2Key]}
+              resetKeys={[selectedVersion._id]}
             >
               <TrackPlayer
-                r2Key={selectedVersion.r2Key}
+                versionId={selectedVersion._id}
                 onTimestampClick={(ts) => setTimestampForComment(ts)}
                 timestampComments={playerTimestampComments}
                 seekToTime={seekToTime}
@@ -242,10 +240,8 @@ export function TrackPage() {
                 Timestamp Comments
               </h2>
               <CommentList
-                comments={timestampComments}
-                currentUserId={viewer?._id}
-                currentAnonymousId={viewer ? undefined : anonymousIdentity.id}
-                isTrackOwner={isOwner}
+                threads={threads?.timestamped}
+                anonymousId={anonymousIdentity.id}
                 onTimestampClick={(ts) => setSeekToTime(ts)}
                 versionId={selectedVersionId}
                 trackId={track._id}
@@ -267,10 +263,8 @@ export function TrackPage() {
                 />
               </div>
               <CommentList
-                comments={generalComments}
-                currentUserId={viewer?._id}
-                currentAnonymousId={viewer ? undefined : anonymousIdentity.id}
-                isTrackOwner={isOwner}
+                threads={threads?.general}
+                anonymousId={anonymousIdentity.id}
                 versionId={selectedVersionId}
                 trackId={track._id}
                 emptyMessage="No comments yet. Start the discussion!"

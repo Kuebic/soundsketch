@@ -20,15 +20,14 @@ export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
   const [deleting, setDeleting] = useState(false);
 
   const navigate = useNavigate();
-  const updateVisibility = useMutation(api.tracks.updateVisibility);
-  const updateDownloadsEnabled = useMutation(api.tracks.updateDownloadsEnabled);
+  const updateSettings = useMutation(api.tracks.updateSettings);
   const deleteTrack = useMutation(api.tracks.deleteTrack);
 
   const downloadsEnabled = track.downloadsEnabled ?? false;
 
   const handleVisibilityChange = async (newVisibility: "public" | "unlisted" | "private") => {
     try {
-      await updateVisibility({ trackId: track._id, visibility: newVisibility });
+      await updateSettings({ trackId: track._id, visibility: newVisibility });
       toast.success(`Track set to ${newVisibility}`);
       setOpen(false);
     } catch {
@@ -38,7 +37,7 @@ export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
 
   const handleDownloadsToggle = async () => {
     try {
-      await updateDownloadsEnabled({ trackId: track._id, enabled: !downloadsEnabled });
+      await updateSettings({ trackId: track._id, downloadsEnabled: !downloadsEnabled });
       toast.success(downloadsEnabled ? 'Downloads disabled' : 'Downloads enabled');
       setOpen(false);
     } catch {

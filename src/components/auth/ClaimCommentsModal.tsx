@@ -83,7 +83,7 @@ export function ClaimCommentsModal({ isOpen, onComplete, anonymousId }: ClaimCom
   const handleSkip = async () => {
     try {
       setSubmitting(true);
-      await claimMutation({ anonymousId, declineAll: true });
+      await claimMutation({ anonymousId, commentIds: [] });
       clearAnonymousIdentity();
       onComplete();
     } catch {

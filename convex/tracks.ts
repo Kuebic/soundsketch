@@ -1,48 +1,42 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { readTrack, requireTrack, requireUserId } from "./lib/access";
+import { cascadeDelete } from "./lib/cascade";
+import { randomId } from "./lib/storageKeys";
 
-/** Generate a short unique ID safe for the Convex mutation runtime. */
-function generateShareableId(length = 10): string {
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-  let id = "";
-  for (let i = 0; i < length; i++) {
-    id += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return id;
+const visibility = v.union(v.literal("public"), v.literal("unlisted"), v.literal("private"));
+
+function cleanTitle(title: string): string {
+  const trimmed = title.trim();
+  if (!trimmed) throw new Error("Title cannot be empty");
+  if (trimmed.length > 200) throw new Error("Title must be 200 characters or fewer");
+  return trimmed;
 }
 
 /**
- * Create a new track
+ * Create a new track (versions are added separately)
  */
 export const create = mutation({
   args: {
     title: v.string(),
     description: v.optional(v.string()),
-    visibility: v.optional(
-      v.union(v.literal("public"), v.literal("unlisted"), v.literal("private"))
-    ),
+    visibility: v.optional(visibility),
     downloadsEnabled: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-
+    const userId = await requireUserId(ctx);
     const user = await ctx.db.get(userId);
     if (!user) throw new Error("User not found");
 
-    const shareableId = generateShareableId();
-
-    // Create track without latestVersionId initially
+    const shareableId = randomId(10);
     const trackId = await ctx.db.insert("tracks", {
-      title: args.title,
-      description: args.description,
+      title: cleanTitle(args.title),
+      description: args.description?.trim() || undefined,
       creatorId: user._id,
       creatorName: user.name ?? "Unknown",
       visibility: args.visibility ?? "unlisted",
       shareableId,
-      latestVersionId: undefined,
       downloadsEnabled: args.downloadsEnabled ?? false,
     });
 
@@ -51,33 +45,8 @@ export const create = mutation({
 });
 
 /**
- * Get track by ID (internal use, no access control)
- */
-export const getById = query({
-  args: { trackId: v.id("tracks") },
-  handler: async (ctx, args) => {
-    return ctx.db.get(args.trackId);
-  },
-});
-
-/**
- * Get all public tracks
- */
-export const getPublicTracks = query({
-  handler: async (ctx) => {
-    const tracks = await ctx.db
-      .query("tracks")
-      .withIndex("by_visibility", (q) => q.eq("visibility", "public"))
-      .order("desc")
-      .take(50);
-
-    return tracks;
-  },
-});
-
-/**
  * Search public tracks by title or creator name.
- * Falls back to default public listing when searchText is empty.
+ * Falls back to the latest public tracks when searchText is empty.
  */
 export const searchPublicTracks = query({
   args: {
@@ -113,9 +82,8 @@ export const searchPublicTracks = query({
     const seen = new Set<string>();
     const merged = [];
     for (const track of [...titleResults, ...creatorResults]) {
-      const id = track._id.toString();
-      if (!seen.has(id)) {
-        seen.add(id);
+      if (!seen.has(track._id)) {
+        seen.add(track._id);
         merged.push(track);
       }
     }
@@ -125,7 +93,8 @@ export const searchPublicTracks = query({
 });
 
 /**
- * Get track by shareable ID with access control
+ * Get track by shareable ID, with the viewer's role on it.
+ * Returns null if the track doesn't exist or the viewer can't see it.
  */
 export const getByShareableId = query({
   args: { shareableId: v.string() },
@@ -134,78 +103,35 @@ export const getByShareableId = query({
       .query("tracks")
       .withIndex("by_shareable_id", (q) => q.eq("shareableId", args.shareableId))
       .first();
-
     if (!track) return null;
 
-    // Public and unlisted tracks are accessible to anyone with the link
-    if (track.visibility === "public" || track.visibility === "unlisted") {
-      return track;
-    }
-
-    // Private tracks require authentication + creator/collaborator access
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-
-    const isCreator = track.creatorId === userId;
-    const hasAccess = await ctx.db
-      .query("trackAccess")
-      .withIndex("by_track_and_user", (q) =>
-        q.eq("trackId", track._id).eq("userId", userId)
-      )
-      .first();
-
-    if (!isCreator && !hasAccess) return null;
-
-    return track;
+    const access = await readTrack(ctx, track);
+    return access && { ...access.track, viewerRole: access.role };
   },
 });
 
 /**
- * Update track visibility setting
+ * Update owner-controlled track settings. Omitted fields are left unchanged.
  */
-export const updateVisibility = mutation({
+export const updateSettings = mutation({
   args: {
     trackId: v.id("tracks"),
-    visibility: v.union(v.literal("public"), v.literal("unlisted"), v.literal("private")),
+    title: v.optional(v.string()),
+    description: v.optional(v.string()),
+    visibility: v.optional(visibility),
+    downloadsEnabled: v.optional(v.boolean()),
   },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-
-    const track = await ctx.db.get(args.trackId);
-    if (!track) throw new Error("Track not found");
-
-    if (track.creatorId !== userId) {
-      throw new Error("Not authorized");
-    }
-
-    await ctx.db.patch(args.trackId, {
-      visibility: args.visibility,
-    });
-  },
-});
-
-/**
- * Update track downloads enabled setting
- */
-export const updateDownloadsEnabled = mutation({
-  args: {
-    trackId: v.id("tracks"),
-    enabled: v.boolean(),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-
-    const track = await ctx.db.get(args.trackId);
-    if (!track) throw new Error("Track not found");
-
-    if (track.creatorId !== userId) {
-      throw new Error("Not authorized");
-    }
-
-    await ctx.db.patch(args.trackId, {
-      downloadsEnabled: args.enabled,
+  handler: async (ctx, { trackId, ...settings }) => {
+    await requireTrack(ctx, trackId, "own");
+    await ctx.db.patch(trackId, {
+      ...(settings.title !== undefined && { title: cleanTitle(settings.title) }),
+      ...(settings.description !== undefined && {
+        description: settings.description.trim() || undefined,
+      }),
+      ...(settings.visibility !== undefined && { visibility: settings.visibility }),
+      ...(settings.downloadsEnabled !== undefined && {
+        downloadsEnabled: settings.downloadsEnabled,
+      }),
     });
   },
 });
@@ -227,7 +153,7 @@ export const getMyTracks = query({
 });
 
 /**
- * Grant a user access to a private track
+ * Grant a user access to a track
  */
 export const grantAccess = mutation({
   args: {
@@ -235,35 +161,29 @@ export const grantAccess = mutation({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const granterId = await getAuthUserId(ctx);
-    if (!granterId) throw new Error("Not authenticated");
-
-    const track = await ctx.db.get(args.trackId);
-    if (!track) throw new Error("Track not found");
-    if (track.creatorId !== granterId) throw new Error("Not authorized");
+    const { userId: granterId } = await requireTrack(ctx, args.trackId, "own");
     if (args.userId === granterId) throw new Error("Cannot grant access to yourself");
+    if (!(await ctx.db.get(args.userId))) throw new Error("User not found");
 
-    // Check if already granted
     const existing = await ctx.db
       .query("trackAccess")
       .withIndex("by_track_and_user", (q) =>
         q.eq("trackId", args.trackId).eq("userId", args.userId)
       )
       .first();
-
     if (existing) return existing._id;
 
     return ctx.db.insert("trackAccess", {
       trackId: args.trackId,
       userId: args.userId,
-      grantedBy: granterId,
+      grantedBy: granterId!,
       grantedAt: Date.now(),
     });
   },
 });
 
 /**
- * Revoke a user's access to a private track
+ * Revoke a user's access to a track
  */
 export const revokeAccess = mutation({
   args: {
@@ -271,12 +191,7 @@ export const revokeAccess = mutation({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const revokerId = await getAuthUserId(ctx);
-    if (!revokerId) throw new Error("Not authenticated");
-
-    const track = await ctx.db.get(args.trackId);
-    if (!track) throw new Error("Track not found");
-    if (track.creatorId !== revokerId) throw new Error("Not authorized");
+    await requireTrack(ctx, args.trackId, "own");
 
     const access = await ctx.db
       .query("trackAccess")
@@ -292,23 +207,19 @@ export const revokeAccess = mutation({
 });
 
 /**
- * Get all collaborators for a track
+ * Get all collaborators for a track (owner only)
  */
 export const getCollaborators = query({
   args: { trackId: v.id("tracks") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-
-    const track = await ctx.db.get(args.trackId);
-    if (!track || track.creatorId !== userId) return [];
+    if (!(await readTrack(ctx, args.trackId, "own"))) return [];
 
     const accessRecords = await ctx.db
       .query("trackAccess")
       .withIndex("by_track", (q) => q.eq("trackId", args.trackId))
       .collect();
 
-    const collaborators = await Promise.all(
+    return Promise.all(
       accessRecords.map(async (record) => {
         const user = await ctx.db.get(record.userId);
         return {
@@ -320,8 +231,6 @@ export const getCollaborators = query({
         };
       })
     );
-
-    return collaborators;
   },
 });
 
@@ -347,24 +256,14 @@ export const getSharedWithMe = query({
 });
 
 /**
- * Delete a track (and all its versions, comments)
+ * Delete a track with all its versions, comments, grants and files
  */
 export const deleteTrack = mutation({
   args: {
     trackId: v.id("tracks"),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-
-    const track = await ctx.db.get(args.trackId);
-    if (!track) throw new Error("Track not found");
-
-    if (track.creatorId !== userId) {
-      throw new Error("Not authorized");
-    }
-
-    // Delete track (versions and comments will need to be cleaned up separately)
-    await ctx.db.delete(args.trackId);
+    await requireTrack(ctx, args.trackId, "own");
+    await cascadeDelete(ctx, [{ kind: "track", id: args.trackId }]);
   },
 });
