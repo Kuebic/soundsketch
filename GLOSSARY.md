@@ -28,4 +28,6 @@
 
 **Claim**: after signing in, a user can take ownership of the guest comments made under their anonymous identity. Unclaimed ones are permanently declined.
 
+**Queue**: the tracks the listener will hear in order, taken from the track list where they pressed play, starting at the track they picked. Each track in the queue plays its latest version. The queue ends after the last track; it does not loop.
+
 **Cascade**: deleting a track, version or comment along with everything under it, including R2 files. Done only by `convex/lib/cascade.ts`.

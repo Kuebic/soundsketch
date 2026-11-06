@@ -55,6 +55,7 @@
 | Show comments across versions | Done | `includeAllVersions` param in queries, toggle in `TrackPage` |
 | Responsive design | Done | Tailwind responsive classes throughout |
 | Loading states + error handling | Done | Conditional rendering, error boundaries, toast notifications |
+| Play from track lists + queue | Done | Play button on every `TrackCard` (Home, Profile); queues the rest of that list (latest versions, skips tracks with no version, stops at the end). `PlayerProvider` + `PlayerBar` keep playing across pages. Only one player sounds at a time (`src/lib/audioFocus.ts`) |
 | Dark mode theming | Done | `studio.*` color palette, Space Mono + Inter fonts |
 
 ### Phase 4: Collaboration Features — Partially Complete
@@ -111,7 +112,7 @@
 
 ### Tests
 
-`npm test` (Vitest + convex-test, edge-runtime). `convex/access.test.ts` (visibility, guest identity, threads, storage keys), `convex/cascade.test.ts` (deletion, account deletion, claiming), `src/lib/fileTypes.test.ts`. Shared helpers in `convex/test.setup.ts`.
+`npm test` (Vitest + convex-test, edge-runtime). `convex/access.test.ts` (visibility, guest identity, threads, storage keys), `convex/cascade.test.ts` (deletion, account deletion, claiming), `src/lib/fileTypes.test.ts`, `src/lib/queue.test.ts`. Shared helpers in `convex/test.setup.ts`.
 
 ---
 
@@ -130,6 +131,8 @@
 | OG meta tags | `index.html` | Static OG/Twitter Card tags, description, theme-color, placeholder image |
 | Utility functions | `src/lib/utils.ts` | cn, formatDuration, formatFileSize, generateShareableLink, formatRelativeTime, getRecordingMimeType, mimeToExtension |
 | File-type registry | `src/lib/fileTypes.ts` | validateUpload(file, 'track' \| 'attachment'), acceptAttribute, attachmentKind, isLossless, extensionOf |
+| Queue logic | `src/lib/queue.ts` | buildQueue(tracks, startTrackId), nextIndex, previousTarget (restart after 3s) |
+| Audio focus | `src/lib/audioFocus.ts` | claimAudioFocus/releaseAudioFocus — starting one player pauses the other (queue player vs. `useWaveform`) |
 | R2 upload | `src/lib/r2Upload.ts` | putToSignedUrl — XHR PUT with progress |
 | Anonymous user utils | `src/lib/anonymousUser.ts` | generateAnonymousName, generateAnonymousId, getAnonymousIdentity (localStorage persistence) |
 | Optimistic updates | `src/lib/optimisticUpdates.ts` | `commentCreateOptimistic` — patches local query cache for instant comment appearance |
@@ -139,8 +142,9 @@
 
 | Hook | Location | Purpose |
 |------|----------|---------|
-| `useWaveform` | `src/hooks/useWaveform.ts` | WaveSurfer.js lifecycle — play/pause, seek, volume, speed, cleanup |
-| `useVersionStreamUrl`, `useAttachmentUrl` | `src/hooks/useSignedUrl.ts` | Signed GET URLs by versionId / commentId, one shared 55-min cache |
+| `useWaveform` | `src/hooks/useWaveform.ts` | WaveSurfer.js lifecycle — play/pause, seek, volume, speed, cleanup; claims audio focus on play |
+| `usePlayer` | `src/hooks/usePlayer.ts` | App-wide queue player from `PlayerProvider`: queue, current, playFrom, toggle, next, previous, seek, setVolume |
+| `useVersionStreamUrl`, `useAttachmentUrl` | `src/hooks/useSignedUrl.ts` | Signed GET URLs by versionId / commentId, one shared 55-min cache; `loadCachedUrl` for the queue player (with `fresh` retry on expiry) |
 | `useFileUpload` | `src/hooks/useFileUpload.ts` | Full upload pipeline: validate → convert lossless (WAV/FLAC) to MP3 via ffmpeg.wasm → dual presigned URLs → XHR to R2 → save metadata. Exposes `stage` (idle/converting/uploading) for progress UI |
 | `useAudioDuration` | `src/hooks/useAudioDuration.ts` | Extract duration from audio File via HTML5 Audio API |
 | `useAttachmentUpload` | `src/hooks/useAttachmentUpload.ts` | Attachment upload for a track: validate → presigned URL → XHR to R2 with progress |
@@ -153,13 +157,13 @@
 
 | Page | Route | Status |
 |------|-------|--------|
-| Home | `/` | Done — hero section + public tracks grid with search (title/creator, via URL `?q=` param) |
+| Home | `/` | Done — hero section + public tracks grid with search (title/creator, via URL `?q=` param); play from card queues the grid |
 | Login | `/login` | Done — email/password, sign in/sign up toggle |
 | Track Detail | `/track/:shareableId` | Done — player, versions, comments (w/ cross-version toggle), settings |
 | Upload | `/upload` | Done — file drop, form, progress bar, redirect |
 | Profile | `/profile` | Done — user info with inline name + email editing, track grid with privacy badges + filter, shared tracks section with filter, account settings with password change and delete account (two modes: anonymize comments or delete everything) |
 
-### Components (26 total)
+### Components (28 total)
 
 | Component | Location | Status |
 |-----------|----------|--------|
@@ -173,7 +177,9 @@
 | ClaimCommentsModal | `src/components/auth/ClaimCommentsModal.tsx` | Done — Modal to selectively claim anonymous comments after login/signup |
 | TrackPlayer | `src/components/audio/TrackPlayer.tsx` | Done — waveform + timestamp markers + external seek + keyboard shortcuts |
 | PlaybackControls | `src/components/audio/PlaybackControls.tsx` | Done — play/pause, progress, volume, speed |
-| TrackCard | `src/components/tracks/TrackCard.tsx` | Done — reusable card for Home + Profile |
+| PlayerProvider | `src/components/audio/PlayerProvider.tsx` | Done — owns the single `<audio>` for the queue; loads URLs per track, retries once with a fresh URL, toasts + skips on failure |
+| PlayerBar | `src/components/audio/PlayerBar.tsx` | Done — fixed bottom bar: seek, prev/play/next, title link, creator, time, volume; hidden until something plays |
+| TrackCard | `src/components/tracks/TrackCard.tsx` | Done — reusable card for Home + Profile; play/pause button (queues `list`), stretched link to the track, accent border when current |
 | TrackDescription | `src/components/tracks/TrackDescription.tsx` | Done — preserves newlines, 4-line preview with Show more/less when overflowing |
 | VersionSelector | `src/components/tracks/VersionSelector.tsx` | Done — dropdown with version names + dates |
 | ShareButton | `src/components/tracks/ShareButton.tsx` | Done — copies link to clipboard with toast |
@@ -192,7 +198,7 @@
 
 ### Routing (`src/App.tsx`)
 
-All routes wired: `/`, `/login`, `/track/:shareableId`, `/upload`, `/profile`, `*` (404). Wrapped in global `ErrorBoundary`. `Toaster` at root level.
+All routes wired: `/`, `/login`, `/track/:shareableId`, `/upload`, `/profile`, `*` (404). Wrapped in global `ErrorBoundary`. `PlayerProvider` wraps everything; `PlayerBar` renders after `<Routes>` so playback survives navigation. `Toaster` at root level, lifted above the bar while it shows.
 
 ---
 
@@ -207,6 +213,7 @@ All routes wired: `/`, `/login`, `/track/:shareableId`, `/upload`, `/profile`, `
 - **R2 upload flow**: `r2.getVersionUploadUrls` / `r2.getAttachmentUploadUrl` (server mints key) → `putToSignedUrl` → save key via mutation (server checks key prefix)
 - **R2 playback flow**: `useVersionStreamUrl(versionId)` (1hr URL, 55-min cache) → WaveSurfer
 - **Attachment flow**: Select file → validate → upload to R2 → store r2Key in comment. Display: images show inline thumbnail (click for fullscreen lightbox), audio plays via `<audio>` element, others show download link
+- **Queue playback**: `usePlayer().playFrom(list, trackId)` → `PlayerProvider` fetches each track's stream URL when it starts → shared `<audio>`. No waveform, no persistence across reloads
 - **WaveSurfer**: Initialize in useEffect, destroy in cleanup. Never leak instances.
 - **Styling**: Tailwind with `studio.*` custom colors, `.card`/`.input` base classes, dark mode default
 
@@ -217,6 +224,11 @@ All routes wired: `/`, `/login`, `/track/:shareableId`, `/upload`, `/profile`, `
 **From PRD — future phases:**
 - Email notifications (requires external email service like Resend)
 - Collaborator roles (viewer/commenter/editor — only basic access grant/revoke exists)
+
+**Queue player — deliberately left out for now:**
+- Waveforms on cards (needs peaks stored at upload)
+- Shuffle, repeat, queue panel, global keyboard shortcuts, queue saved across reloads
+- Track page driving the shared queue `<audio>` (currently the two players just pause each other)
 
 **Tooling:**
 - ~~Tests~~ — Done (Vitest + convex-test, `npm test`)

@@ -340,7 +340,7 @@ export function Profile() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredMyTracks?.map((track) => (
-                <TrackCard key={track._id} track={track} showPrivacyBadge />
+                <TrackCard key={track._id} track={track} list={filteredMyTracks} showPrivacyBadge />
               ))}
             </div>
           )}
@@ -384,7 +384,7 @@ export function Profile() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredSharedTracks?.map((track) => (
-                <TrackCard key={track._id} track={track} />
+                <TrackCard key={track._id} track={track} list={filteredSharedTracks} />
               ))}
             </div>
           )}

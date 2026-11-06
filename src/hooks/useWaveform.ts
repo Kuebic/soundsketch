@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
+import { claimAudioFocus, releaseAudioFocus } from '@/lib/audioFocus';
 
 interface UseWaveformOptions {
   audioUrl: string;
@@ -52,7 +53,12 @@ export function useWaveform({
       onReadyRef.current?.();
     });
 
-    wavesurfer.on('play', () => setIsPlaying(true));
+    const pauseThis = () => wavesurfer.pause();
+
+    wavesurfer.on('play', () => {
+      claimAudioFocus(pauseThis);
+      setIsPlaying(true);
+    });
     wavesurfer.on('pause', () => setIsPlaying(false));
 
     wavesurfer.on('timeupdate', (time) => {
@@ -68,6 +74,7 @@ export function useWaveform({
     wavesurferRef.current = wavesurfer;
 
     return () => {
+      releaseAudioFocus(pauseThis);
       wavesurfer.destroy();
       wavesurferRef.current = null;
     };
