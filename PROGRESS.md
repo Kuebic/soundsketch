@@ -146,7 +146,7 @@
 | Hook | Location | Purpose |
 |------|----------|---------|
 | `useWaveform` | `src/hooks/useWaveform.ts` | WaveSurfer.js lifecycle: play/pause, seek, volume, speed, cleanup; claims audio focus on play |
-| `usePlayer` | `src/hooks/usePlayer.ts` | App-wide queue player from `PlayerProvider`: queue, current, playFrom, toggle, next, previous, seek, setVolume, close |
+| `usePlayer` | `src/hooks/usePlayer.ts` | App-wide queue player from `PlayerProvider`: queue, current, source, ended, playFrom(tracks, trackId, source?), toggle, next, previous, seek, setVolume, close |
 | `useVersionStreamUrl`, `useAttachmentUrl` | `src/hooks/useSignedUrl.ts` | Signed GET URLs by versionId / commentId, one shared 55-min cache; `loadCachedUrl` for the queue player (with `fresh` retry on expiry) |
 | `useFileUpload` | `src/hooks/useFileUpload.ts` | Full upload pipeline: validate -> convert lossless (WAV/FLAC) to MP3 via ffmpeg.wasm -> dual presigned URLs -> XHR to R2 -> save metadata. Exposes `stage` (idle/converting/uploading) for progress UI |
 | `useAudioDuration` | `src/hooks/useAudioDuration.ts` | Extract duration from audio File via HTML5 Audio API |
@@ -163,11 +163,11 @@
 | Home | `/` | Done: compact hero section + public tracks grid (title/creator search via URL `?q=` param) + empty-state CTA; play from card queues the grid |
 | Login | `/login` | Done: email/password, sign in/sign up toggle, password visibility toggle, autocomplete attributes |
 | Track Detail | `/track/:shareableId` | Done: pinned version session state, waveform player with double-click / button timestamp commenting, comments (with accessible cross-version switch), settings menu |
-| Playlist | `/playlist/:shareableId` | Done: opens for anyone with the link; title, description, creator, track count + total duration, Play button (queues the list from the first track with audio via `usePlayer().playFrom`; Pause/Resume while the queue is this playlist's, per `isQueueFrom`), ordered track list (per-row play from that track, now-playing mark, duration, link to track page), "N tracks unavailable" note, share button (copies the playlist link), empty and not-found states. Owner controls render from `viewerRole`: edit title/description, move a track up/down, remove a track |
+| Playlist | `/playlist/:shareableId` | Done: opens for anyone with the link; title, description, creator, track count + total duration, Play button (queues the list from the first track with audio via `usePlayer().playFrom`; Pause/Resume while the queue was started here (`player.source`), still matches the list (`isQueueFrom`) and has not ended), ordered track list (per-row play from that track, now-playing mark, duration, link to track page), "N tracks unavailable" note, share button (copies the playlist link), empty and not-found states. Owner controls render from `viewerRole`: edit title/description, move a track up/down, remove a track |
 | Upload | `/upload` | Done: card-framed drop zone + form, accessible visibility radio group, progress bar, redirect |
 | Profile | `/profile` | Done: initial avatar card with inline name + email editing, responsive track header + full-width mobile filters, Playlists section (create, open), shared tracks section, account settings with password change, sign out, and two-mode account deletion |
 
-### Components (32 total)
+### Components (33 total)
 
 | Component | Location | Status |
 |-----------|----------|--------|
@@ -201,6 +201,7 @@
 | TimestampMarker | `src/components/comments/TimestampMarker.tsx` | Done: waveform overlay markers clamped within edges, mobile-friendly touch hit target, focus-visible tooltip |
 | MentionInput | `src/components/comments/MentionInput.tsx` | Done: textarea with @mention autocomplete dropdown |
 | AudioRecordingModal | `src/components/comments/AudioRecordingModal.tsx` | Done: record voice feedback via browser mic, preview, attach to comment |
+| DownloadButton | `src/components/tracks/DownloadButton.tsx` | Done: downloads a version's original or streaming file via a signed URL |
 | TrackFilter | `src/components/tracks/TrackFilter.tsx` | Done: inline filter input for Profile page sections |
 | FileDropZone | `src/components/upload/FileDropZone.tsx` | Done: keyboard-accessible drag-drop + format pills + `maxUploadBytes` limit display + validation |
 

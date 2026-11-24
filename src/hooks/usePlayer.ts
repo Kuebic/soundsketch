@@ -6,12 +6,19 @@ export interface Player {
   queue: QueueItem[];
   /** The queue item playing or paused, or null before anything was played. */
   current: QueueItem | null;
+  /** Where the queue was taken from, as given to `playFrom` (e.g. a playlist), or null. */
+  source: string | null;
+  /** True once the last item has finished or been skipped, until something plays again. */
+  ended: boolean;
   isPlaying: boolean;
   currentTime: number;
   duration: number;
   volume: number;
-  /** Start a new queue at `trackId` in the list the listener pressed play on. */
-  playFrom: (tracks: Track[], trackId: TrackId) => void;
+  /**
+   * Start a new queue at `trackId` in the list the listener pressed play on.
+   * `source` names that list so its page can recognise the queue as its own.
+   */
+  playFrom: (tracks: Track[], trackId: TrackId, source?: string) => void;
   toggle: () => void;
   next: () => void;
   previous: () => void;

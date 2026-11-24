@@ -21,7 +21,9 @@ export function PlaylistPage() {
   const player = usePlayer();
   const moveTrack = useMutation(api.playlists.moveTrack);
   const removeTrack = useMutation(api.playlists.removeTrack);
-  const [editing, setEditing] = useState(false);
+  // Holds the id of the playlist being edited, so the form cannot follow a
+  // route change to another playlist.
+  const [editingId, setEditingId] = useState<string | null>(null);
   const { shareableId } = useParams<{ shareableId: string }>();
   const playlist = useQuery(
     api.playlists.getByShareableId,
@@ -63,17 +65,13 @@ export function PlaylistPage() {
   // The queue is built from this list; it skips tracks with no audio, so
   // Play only has to find the first one that has some.
   const firstPlayable = tracks.find((track) => track.latestVersionId);
-  // Sharing a track is not enough to call the queue ours: the same track
-  // may be playing from Home, or this list may have changed since.
-  const queuedHere = isQueueFrom(player.queue, tracks);
-  const lastQueued = player.queue[player.queue.length - 1];
-  const finished =
-    !player.isPlaying &&
-    player.current?.trackId === lastQueued?.trackId &&
-    player.duration > 0 &&
-    player.currentTime >= player.duration - 0.25;
-  const canToggle = queuedHere && !finished;
-  const playingHere = queuedHere && player.isPlaying;
+  // The queue is ours only if it was started here and still matches the
+  // list; the same track may be playing from Home, or the list may have
+  // changed since. Then Play starts afresh instead of resuming.
+  const source = `playlist:${playlist._id}`;
+  const queuedHere = player.source === source && isQueueFrom(player.queue, tracks);
+  const canToggle = queuedHere && !player.ended;
+  const playingHere = canToggle && player.isPlaying;
 
   const playlistId = playlist._id;
   const handleMove = async (trackId: TrackId, direction: 'up' | 'down') => {
@@ -94,7 +92,7 @@ export function PlaylistPage() {
 
   const handlePlayAll = () => {
     if (canToggle) player.toggle();
-    else if (firstPlayable) player.playFrom(tracks, firstPlayable._id);
+    else if (firstPlayable) player.playFrom(tracks, firstPlayable._id, source);
   };
 
   return (
@@ -129,7 +127,7 @@ export function PlaylistPage() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => setEditing(true)}
+                  onClick={() => setEditingId(playlist._id)}
                   aria-label="Edit playlist"
                   title="Edit playlist"
                 >
@@ -164,7 +162,10 @@ export function PlaylistPage() {
           <ol className="card p-0 divide-y divide-studio-gray overflow-hidden">
             {tracks.map((track, index) => {
               const isCurrent = player.current?.trackId === track._id;
-              const isPlaying = isCurrent && player.isPlaying;
+              // Icon, label and action share one condition, so the button never
+              // says Pause while a press would restart the track.
+              const togglesHere = isCurrent && canToggle;
+              const isPlaying = togglesHere && player.isPlaying;
               const canPlay = !!track.latestVersionId;
               return (
                 <li
@@ -178,7 +179,7 @@ export function PlaylistPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      isCurrent && canToggle ? player.toggle() : player.playFrom(tracks, track._id)
+                      togglesHere ? player.toggle() : player.playFrom(tracks, track._id, source)
                     }
                     disabled={!canPlay}
                     aria-label={isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
@@ -191,7 +192,7 @@ export function PlaylistPage() {
                       isCurrent && 'bg-studio-accent text-white'
                     )}
                   >
-                    {isCurrent ? (
+                    {togglesHere ? (
                       isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />
                     ) : canPlay ? (
                       <>
@@ -212,7 +213,15 @@ export function PlaylistPage() {
                     >
                       {track.title}
                     </Link>
-                    <p className="truncate text-xs text-studio-text-secondary">{track.creatorName}</p>
+                    <p className="truncate text-xs text-studio-text-secondary">
+                      {track.creatorName}
+                      {isOwner && (
+                        <span className="mono sm:hidden">
+                          {' · '}
+                          {track.duration === null ? 'No audio' : formatDuration(track.duration)}
+                        </span>
+                      )}
+                    </p>
                   </div>
                   <span
                     className={cn(
@@ -265,7 +274,9 @@ export function PlaylistPage() {
           </p>
         )}
 
-        {editing && <EditPlaylistModal playlist={playlist} onClose={() => setEditing(false)} />}
+        {isOwner && editingId === playlist._id && (
+          <EditPlaylistModal playlist={playlist} onClose={() => setEditingId(null)} />
+        )}
       </main>
     </div>
   );

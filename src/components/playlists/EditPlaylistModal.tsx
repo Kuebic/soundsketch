@@ -14,8 +14,9 @@ interface EditPlaylistModalProps {
 /** Rename a playlist and edit its description. Mount it only while open. */
 export function EditPlaylistModal({ onClose, playlist }: EditPlaylistModalProps) {
   const updatePlaylist = useMutation(api.playlists.update);
-  const [title, setTitle] = useState(playlist.title);
-  const [description, setDescription] = useState(playlist.description ?? '');
+  const [initial] = useState({ title: playlist.title, description: playlist.description ?? '' });
+  const [title, setTitle] = useState(initial.title);
+  const [description, setDescription] = useState(initial.description);
   const [saving, setSaving] = useState(false);
 
   // Not dismissable mid-save, so a late result cannot close a reopened form.
@@ -28,7 +29,12 @@ export function EditPlaylistModal({ onClose, playlist }: EditPlaylistModalProps)
     if (!title.trim() || saving) return;
     try {
       setSaving(true);
-      await updatePlaylist({ playlistId: playlist._id, title, description });
+      // Only what was changed here, so an edit made elsewhere meanwhile survives.
+      await updatePlaylist({
+        playlistId: playlist._id,
+        ...(title !== initial.title && { title }),
+        ...(description !== initial.description && { description }),
+      });
       toast.success('Playlist updated');
       onClose();
     } catch {

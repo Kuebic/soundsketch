@@ -62,6 +62,13 @@ describe('queue', () => {
     expect(isQueueFrom([], playlist)).toBe(false);
   });
 
+  test('a queue stops belonging once a track in it has a newer version', () => {
+    const before = [track('a'), track('b')];
+    const queue = buildQueue(before, 'a' as TrackId)!;
+    const after = [track('a'), { ...track('b'), latestVersionId: 'v-b2' as VersionId }];
+    expect(isQueueFrom(queue, after)).toBe(false);
+  });
+
   test('a queue stops belonging once the list gains a track after it', () => {
     const before = [track('a'), track('b')];
     const queue = buildQueue(before, 'a' as TrackId)!;

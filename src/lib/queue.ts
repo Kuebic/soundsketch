@@ -47,13 +47,20 @@ export function previousTarget(index: number, currentTime: number): 'restart' | 
 }
 
 /**
- * Whether a queue is what pressing play in this list would have produced:
- * the list's playable tracks from some track to the end. A shared track is
- * not enough; the same track can be queued from another list.
+ * Whether a queue is still what pressing play in this list would produce:
+ * the list's playable tracks, at their latest versions, from some track to
+ * the end. False once the list is reordered, trimmed, extended or re-versioned
+ * under the queue. It cannot tell two lists with the same tail apart; the
+ * player's `source` does that.
  */
 export function isQueueFrom(queue: QueueItem[], tracks: QueueSource[]): boolean {
   if (queue.length === 0) return false;
-  const playable = tracks.filter((t) => t.latestVersionId).map((t) => t._id);
+  const playable = tracks.filter((t) => t.latestVersionId);
   const tail = playable.slice(playable.length - queue.length);
-  return tail.length === queue.length && queue.every((item, i) => item.trackId === tail[i]);
+  return (
+    tail.length === queue.length &&
+    queue.every(
+      (item, i) => item.trackId === tail[i]._id && item.versionId === tail[i].latestVersionId
+    )
+  );
 }

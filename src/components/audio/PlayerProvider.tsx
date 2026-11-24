@@ -13,6 +13,10 @@ interface QueueState {
   index: number;
   /** Bumped whenever a queue item should (re)start loading. */
   playId: number;
+  /** The list the queue was taken from, when the caller named it. */
+  source: string | null;
+  /** The last item finished or was skipped; cleared when playback starts again. */
+  ended: boolean;
 }
 
 /**
@@ -25,7 +29,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   getStreamUrlRef.current = getStreamUrl;
 
   const [audio] = useState(() => new Audio());
-  const [{ queue, index, playId }, setQueueState] = useState<QueueState>({ queue: [], index: 0, playId: 0 });
+  const [{ queue, index, playId, source, ended }, setQueueState] = useState<QueueState>({
+    queue: [],
+    index: 0,
+    playId: 0,
+    source: null,
+    ended: false,
+  });
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -54,10 +64,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  const advance = useCallback(() => {
+  const next = useCallback(() => {
     setQueueState((s) => {
       const i = nextIndex(s.index, s.queue.length);
       return i === null ? s : { ...s, index: i, playId: s.playId + 1 };
+    });
+  }, []);
+
+  /** The current item is over (played out or unplayable): move on, or mark the queue ended. */
+  const advance = useCallback(() => {
+    setQueueState((s) => {
+      const i = nextIndex(s.index, s.queue.length);
+      return i === null ? { ...s, ended: true } : { ...s, index: i, playId: s.playId + 1 };
     });
   }, []);
 
@@ -103,6 +121,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const onPlay = () => {
       claimAudioFocus(pauseAudio);
       setIsPlaying(true);
+      setQueueState((s) => (s.ended ? { ...s, ended: false } : s));
     };
     const onPause = () => setIsPlaying(false);
     const onPlaying = () => {
@@ -167,10 +186,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     };
   }, [audio, advance, invalidatePendingLoad, loadUrl, skip]);
 
-  const playFrom = useCallback<Player['playFrom']>((tracks, trackId) => {
+  const playFrom = useCallback<Player['playFrom']>((tracks, trackId, source) => {
     const items = buildQueue(tracks, trackId);
     if (!items) return;
-    setQueueState((s) => ({ queue: items, index: 0, playId: s.playId + 1 }));
+    setQueueState((s) => ({
+      queue: items,
+      index: 0,
+      playId: s.playId + 1,
+      source: source ?? null,
+      ended: false,
+    }));
   }, []);
 
   const toggle = useCallback(() => {
@@ -185,7 +210,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       audio.currentTime = 0;
       setCurrentTime(0);
     } else {
-      setQueueState((s) => ({ ...s, index: target, playId: s.playId + 1 }));
+      setQueueState((s) => ({ ...s, index: target, playId: s.playId + 1, ended: false }));
     }
   }, [audio, index]);
 
@@ -215,26 +240,28 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     audio.load();
     setCurrentTime(0);
     setDuration(0);
-    setQueueState((s) => ({ queue: [], index: 0, playId: s.playId + 1 }));
+    setQueueState((s) => ({ queue: [], index: 0, playId: s.playId + 1, source: null, ended: false }));
   }, [audio, invalidatePendingLoad]);
 
   const player = useMemo<Player>(
     () => ({
       queue,
       current,
+      source,
+      ended,
       isPlaying,
       currentTime,
       duration,
       volume,
       playFrom,
       toggle,
-      next: advance,
+      next,
       previous,
       seek,
       setVolume,
       close,
     }),
-    [queue, current, isPlaying, currentTime, duration, volume, playFrom, toggle, advance, previous, seek, setVolume, close]
+    [queue, current, source, ended, isPlaying, currentTime, duration, volume, playFrom, toggle, next, previous, seek, setVolume, close]
   );
 
   return <PlayerContext.Provider value={player}>{children}</PlayerContext.Provider>;
