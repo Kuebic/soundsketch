@@ -19,7 +19,10 @@ export function CreatePlaylistModal({ isOpen, onClose, onCreated }: CreatePlayli
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Not dismissable mid-save: the pending request would still close and
+  // navigate from under whatever the user opened next.
   const handleClose = () => {
+    if (saving) return;
     setTitle('');
     setDescription('');
     onClose();
@@ -32,11 +35,13 @@ export function CreatePlaylistModal({ isOpen, onClose, onCreated }: CreatePlayli
       setSaving(true);
       const created = await createPlaylist({ title, description: description || undefined });
       toast.success('Playlist created');
-      handleClose();
+      setSaving(false);
+      setTitle('');
+      setDescription('');
+      onClose();
       onCreated?.(created);
     } catch {
       toast.error('Failed to create playlist');
-    } finally {
       setSaving(false);
     }
   };
@@ -73,7 +78,7 @@ export function CreatePlaylistModal({ isOpen, onClose, onCreated }: CreatePlayli
           />
         </div>
         <div className="flex justify-end gap-3">
-          <Button type="button" variant="secondary" size="sm" onClick={handleClose}>
+          <Button type="button" variant="secondary" size="sm" onClick={handleClose} disabled={saving}>
             Cancel
           </Button>
           <Button type="submit" size="sm" disabled={!title.trim() || saving}>

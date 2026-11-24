@@ -28,6 +28,8 @@ describe("creating a playlist", () => {
 
   test("a signed-out caller cannot create a playlist", async () => {
     const t = setup();
+    const owner = await signIn(t, "Owner");
+    await owner.as.mutation(api.playlists.create, { title: "Someone else's" });
     await expect(t.mutation(api.playlists.create, { title: "Demos" })).rejects.toThrow(
       "Not authenticated",
     );
@@ -78,6 +80,8 @@ describe("opening a playlist by its link", () => {
 
   test("an unknown link returns null", async () => {
     const t = setup();
+    const owner = await signIn(t, "Owner");
+    await owner.as.mutation(api.playlists.create, { title: "Demos" });
     expect(await t.query(api.playlists.getByShareableId, { shareableId: "nope" })).toBeNull();
   });
 
