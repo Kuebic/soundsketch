@@ -9,6 +9,7 @@ import { VersionSelector } from '@/components/tracks/VersionSelector';
 import { ShareButton } from '@/components/tracks/ShareButton';
 import { TrackSettingsDropdown } from '@/components/tracks/TrackSettingsDropdown';
 import { AddVersionModal } from '@/components/tracks/AddVersionModal';
+import { AddToPlaylistModal } from '@/components/playlists/AddToPlaylistModal';
 import { DownloadButton } from '@/components/tracks/DownloadButton';
 import { TrackDescription } from '@/components/tracks/TrackDescription';
 import { CommentForm } from '@/components/comments/CommentForm';
@@ -17,7 +18,7 @@ import { Button } from '@/components/ui/Button';
 import { PlayerErrorFallback } from '@/components/ui/PlayerErrorFallback';
 import { useAnonymousIdentity } from '@/hooks/useAnonymousIdentity';
 import { cn, formatDuration } from '@/lib/utils';
-import { Loader2, Globe, Lock, Link2, Plus, X, Clock, MessageCircle, Layers } from 'lucide-react';
+import { Loader2, Globe, Lock, Link2, ListPlus, Plus, X, Clock, MessageCircle, Layers } from 'lucide-react';
 import type { VersionId } from '@/types';
 
 const VISIBILITY_LABEL = {
@@ -82,6 +83,7 @@ export function TrackPage() {
   );
 
   const isOwner = track?.viewerRole === 'owner';
+  const [addToPlaylistOpen, setAddToPlaylistOpen] = useState(false);
 
   // Build timestamp markers for the player
   const playerTimestampComments = threads?.timestamped.map((c) => ({
@@ -148,7 +150,24 @@ export function TrackPage() {
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <ShareButton shareableId={track.shareableId} />
+              {/* Owners get this inside the settings menu. */}
+              {viewer && !isOwner && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setAddToPlaylistOpen(true)}
+                  aria-label="Add to playlist"
+                  title="Add to playlist"
+                >
+                  <ListPlus className="w-4 h-4" />
+                </Button>
+              )}
               {isOwner && <TrackSettingsDropdown track={track} />}
+              <AddToPlaylistModal
+                isOpen={addToPlaylistOpen}
+                onClose={() => setAddToPlaylistOpen(false)}
+                track={track}
+              />
             </div>
           </div>
           {track.description && (

@@ -99,7 +99,7 @@
 | File | Functions | Status |
 |------|-----------|--------|
 | `convex/tracks.ts` | create, searchPublicTracks, getByShareableId (returns `viewerRole`), updateSettings (title/description/visibility/downloads), getMyTracks, deleteTrack (cascades), grantAccess, revokeAccess, getCollaborators, getSharedWithMe | Done |
-| `convex/playlists.ts` | create, getMyPlaylists (with `trackCount`), getByShareableId (anyone with the link; returns `viewerRole`, the tracks this viewer has a role on in order with `duration`, and `hiddenCount` for the rest), addTrack (owner; must be able to view the track; no duplicates; max 100) | Done |
+| `convex/playlists.ts` | create, getMyPlaylists (with `trackCount`), getByShareableId (anyone with the link; returns `viewerRole`, the tracks this viewer has a role on in order with `duration`, and `hiddenCount` for the rest), addTrack (owner; must be able to view the track; no duplicates; max 100; coded `ConvexError`s `already_in_playlist` / `playlist_full`) | Done |
 | `convex/versions.ts` | create (rate-limited, validates R2 key prefix), getByTrack (access-checked, no storage keys), deleteVersion (cascades, re-points latestVersionId) | Done |
 | `convex/comments.ts` | listThreads (timestamped + general threads with nested replies and per-comment `canEdit`/`canDelete`), create (guest-friendly, replies attach to thread root, rate-limited), updateComment, deleteComment (cascades to replies + attachment), getAnonymousCommentsForClaiming, claimAnonymousComments (claim listed, decline rest) | Done |
 | `convex/storage.ts` | Internal queries that authorize file access and mint upload keys: versionStreamKey, versionDownloadKey, attachmentDownloadKey, newVersionKeys, newAttachmentKey | Done |
@@ -174,7 +174,7 @@
 | Navbar | `src/components/layout/Navbar.tsx` | Done: logo, search bar (with mobile overlay trigger), auth-conditional links, keyboard-accessible account menu (Profile + Sign Out) |
 | SearchBar | `src/components/layout/SearchBar.tsx` | Done: debounced search input, URL param sync, desktop inline bar + mobile overlay mode |
 | Button | `src/components/ui/Button.tsx` | Done: primary/secondary/danger, sm/md/lg, inline-flex icon/label alignment, focus-visible ring |
-| Modal | `src/components/ui/Modal.tsx` | Done: portalled to `<body>`, backdrop blur, ESC close, responsive sizes |
+| Modal | `src/components/ui/Modal.tsx` | Done: portalled to `<body>`, `role="dialog"`, focus moved in / trapped / restored, scroll lock, backdrop blur, ESC close, responsive sizes |
 | ErrorFallback | `src/components/ui/ErrorFallback.tsx` | Done: full-page error boundary fallback |
 | PlayerErrorFallback | `src/components/ui/PlayerErrorFallback.tsx` | Done: inline audio player error fallback |
 | LoginForm | `src/components/auth/LoginForm.tsx` | Done: Convex Auth integration, username-based signup/login, optional email, password visibility toggle |
@@ -188,7 +188,7 @@
 | VersionSelector | `src/components/tracks/VersionSelector.tsx` | Done: custom accessible select chevron with version names + dates |
 | ShareButton | `src/components/tracks/ShareButton.tsx` | Done: copies a track or playlist link (`kind` prop) to clipboard with toast confirmation |
 | CreatePlaylistModal | `src/components/playlists/CreatePlaylistModal.tsx` | Done: title + optional description form; reports the new playlist via `onCreated` |
-| AddToPlaylistModal | `src/components/playlists/AddToPlaylistModal.tsx` | Done: lists the user's playlists with track counts + "New playlist"; adds the given track. Opened from `TrackCard` and `TrackSettingsDropdown` |
+| AddToPlaylistModal | `src/components/playlists/AddToPlaylistModal.tsx` | Done: lists the user's playlists with track counts + "New playlist"; adds the given track. Opened from `TrackCard`, `TrackSettingsDropdown` (owner) and the track page header (other signed-in viewers) |
 | TrackSettingsDropdown | `src/components/tracks/TrackSettingsDropdown.tsx` | Done: WAI-ARIA keyboard menu (visibility, downloads, collaborators, add to playlist, delete) with outside-click and Tab dismissal |
 | AddVersionModal | `src/components/tracks/AddVersionModal.tsx` | Done: file upload + version metadata |
 | ManageCollaboratorsModal | `src/components/tracks/ManageCollaboratorsModal.tsx` | Done: invite by email, list/remove collaborators |

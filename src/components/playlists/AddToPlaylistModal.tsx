@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery } from 'convex/react';
+import { ConvexError } from 'convex/values';
 import { toast } from 'sonner';
 import { ListMusic, Loader2, Plus } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
@@ -31,10 +32,11 @@ export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModa
       toast.success(`Added to ${playlistTitle}`);
       onClose();
     } catch (error) {
-      const message = error instanceof Error ? error.message : '';
-      if (message.includes('already in this playlist')) {
+      const code =
+        error instanceof ConvexError ? (error.data as { code?: string } | null)?.code : undefined;
+      if (code === 'already_in_playlist') {
         toast.error(`Already in ${playlistTitle}`);
-      } else if (message.includes('at most')) {
+      } else if (code === 'playlist_full') {
         toast.error(`${playlistTitle} is full`);
       } else {
         toast.error('Failed to add to playlist');
@@ -42,6 +44,11 @@ export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModa
     } finally {
       setAdding(false);
     }
+  };
+
+  // Not dismissable mid-add: the pending request would close a reopened picker.
+  const handleClose = () => {
+    if (!adding) onClose();
   };
 
   if (creating) {
@@ -58,7 +65,7 @@ export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModa
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Add to Playlist" size="sm">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Add to Playlist" size="sm">
       <p className="text-sm text-studio-text-secondary mb-4 truncate">{track.title}</p>
       {playlists === undefined ? (
         <div className="flex items-center justify-center py-6">

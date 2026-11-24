@@ -257,6 +257,48 @@ describe("tracks in a playlist are resolved for each viewer", () => {
     }
   });
 
+  test("the playlist owner gets no special pass: a track they lose access to is hidden from them too", async () => {
+    const t = setup();
+    const owner = await signIn(t, "Owner");
+    const musician = await signIn(t, "Musician");
+    const { playlistId, shareableId } = await owner.as.mutation(api.playlists.create, { title: "Mix" });
+    const mine = await createTrack(owner.as, "Mine", "public", 60);
+    const theirs = await createTrack(musician.as, "Theirs", "private", 4242);
+    await musician.as.mutation(api.tracks.grantAccess, { trackId: theirs, userId: owner.userId });
+    await owner.as.mutation(api.playlists.addTrack, { playlistId, trackId: mine });
+    await owner.as.mutation(api.playlists.addTrack, { playlistId, trackId: theirs });
+
+    await musician.as.mutation(api.tracks.revokeAccess, { trackId: theirs, userId: owner.userId });
+
+    const playlist = await owner.as.query(api.playlists.getByShareableId, { shareableId });
+    expect(playlist).toEqual({
+      _id: playlistId,
+      title: "Mix",
+      description: undefined,
+      creatorName: "Owner",
+      shareableId,
+      viewerRole: "owner",
+      tracks: [expect.objectContaining({ _id: mine, title: "Mine", creatorName: "Owner", duration: 60 })],
+      hiddenCount: 1,
+    });
+    expect(Object.keys(playlist!.tracks[0]).sort()).toEqual(
+      [
+        "_creationTime",
+        "_id",
+        "creatorId",
+        "creatorName",
+        "downloadsEnabled",
+        "duration",
+        "latestVersionId",
+        "shareableId",
+        "title",
+        "visibility",
+      ].sort(),
+    );
+    // The musician still sees their own track through the same link.
+    expect(await titlesSeenBy(musician.as, shareableId)).toEqual(["Mine", "Theirs"]);
+  });
+
   test("a track made private after it was added drops out for guests", async () => {
     const t = setup();
     const owner = await signIn(t, "Owner");

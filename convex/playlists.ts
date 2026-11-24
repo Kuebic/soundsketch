@@ -1,6 +1,6 @@
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { readPlaylist, readTrack, requirePlaylist, requireTrack, requireUserId } from "./lib/access";
 import { randomId } from "./lib/storageKeys";
@@ -132,10 +132,17 @@ export const addTrack = mutation({
 
     const entries = await entriesOf(ctx, args.playlistId);
     if (entries.some((entry) => entry.trackId === args.trackId)) {
-      throw new Error("Track is already in this playlist");
+      // Coded: the picker tells these apart, and plain messages are redacted in production.
+      throw new ConvexError({
+        code: "already_in_playlist" as const,
+        message: "Track is already in this playlist",
+      });
     }
     if (entries.length >= MAX_TRACKS) {
-      throw new Error(`A playlist can hold at most ${MAX_TRACKS} tracks`);
+      throw new ConvexError({
+        code: "playlist_full" as const,
+        message: `A playlist can hold at most ${MAX_TRACKS} tracks`,
+      });
     }
 
     const last = entries[entries.length - 1];

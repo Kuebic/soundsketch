@@ -119,8 +119,7 @@ export function PlaylistPage() {
         {hiddenCount > 0 && (
           <p className="mt-3 flex items-center gap-2 text-sm text-studio-text-secondary">
             <EyeOff className="w-4 h-4 shrink-0" />
-            {hiddenCount} {hiddenCount === 1 ? 'track is' : 'tracks are'} unavailable to you. Ask{' '}
-            {playlist.creatorName} for access.
+            {hiddenCount} {hiddenCount === 1 ? 'track is' : 'tracks are'} unavailable to you.
           </p>
         )}
       </main>
