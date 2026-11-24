@@ -85,7 +85,7 @@ export const getTrackParticipants = query({
 
 /**
  * Update the current user's display name.
- * Also propagates to denormalized creatorName/authorName on tracks and comments.
+ * Also propagates to denormalized creatorName/authorName on tracks, playlists and comments.
  */
 export const updateName = mutation({
   args: {
@@ -108,6 +108,16 @@ export const updateName = mutation({
 
     for (const track of tracks) {
       await ctx.db.patch(track._id, { creatorName: trimmed });
+    }
+
+    // ...on their playlists
+    const playlists = await ctx.db
+      .query("playlists")
+      .withIndex("by_creator", (q) => q.eq("creatorId", userId))
+      .collect();
+
+    for (const playlist of playlists) {
+      await ctx.db.patch(playlist._id, { creatorName: trimmed });
     }
 
     // ...and denormalized authorName on their comments

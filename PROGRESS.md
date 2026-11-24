@@ -91,20 +91,22 @@
 - **comments** — versionId, trackId, authorId (optional), authorName, commentText, timestamp (optional), parentCommentId (threading), attachmentR2Key, attachmentFileName, anonymousId (optional), claimedByUser (optional: true = claimed, false = permanently declined). Indexes: by_version, by_track, by_parent, by_timestamp, by_anonymous_id, by_author
 - **rateLimits** — key, timestamps (array). Index: by_key. Used for server-side rate limiting
 - **trackAccess** — trackId, userId, grantedBy, grantedAt. Indexes: by_track, by_user, by_track_and_user
+- **playlists** — title, description (optional), creatorId, creatorName, shareableId. Indexes: by_creator, by_shareable_id. Link-only: no visibility field (ADR 0003)
 
 ### Convex Functions
 
 | File | Functions | Status |
 |------|-----------|--------|
 | `convex/tracks.ts` | create, searchPublicTracks, getByShareableId (returns `viewerRole`), updateSettings (title/description/visibility/downloads), getMyTracks, deleteTrack (cascades), grantAccess, revokeAccess, getCollaborators, getSharedWithMe | Done |
+| `convex/playlists.ts` | create, getMyPlaylists, getByShareableId (anyone with the link; returns `viewerRole`) | Done |
 | `convex/versions.ts` | create (rate-limited, validates R2 key prefix), getByTrack (access-checked, no storage keys), deleteVersion (cascades, re-points latestVersionId) | Done |
 | `convex/comments.ts` | listThreads (timestamped + general threads with nested replies and per-comment `canEdit`/`canDelete`), create (guest-friendly, replies attach to thread root, rate-limited), updateComment, deleteComment (cascades to replies + attachment), getAnonymousCommentsForClaiming, claimAnonymousComments (claim listed, decline rest) | Done |
 | `convex/storage.ts` | Internal queries that authorize file access and mint upload keys: versionStreamKey, versionDownloadKey, attachmentDownloadKey, newVersionKeys, newAttachmentKey | Done |
 | `convex/r2.ts` | Actions (Node): getVersionStreamUrl, getVersionDownloadUrl, getAttachmentUrl, getVersionUploadUrls, getAttachmentUploadUrl; internal deleteObjects | Done |
-| `convex/users.ts` | viewer, searchByEmail, getTrackParticipants (access-checked), updateName (propagates creatorName + comment authorName), checkUsernameAvailable, resolveLoginIdentifier, updateEmail, changePassword, deleteAccount (cascades; also removes auth sessions/accounts) | Done |
+| `convex/users.ts` | viewer, searchByEmail, getTrackParticipants (access-checked), updateName (propagates creatorName on tracks and playlists + comment authorName), checkUsernameAvailable, resolveLoginIdentifier, updateEmail, changePassword, deleteAccount (cascades; also removes auth sessions/accounts) | Done |
 | `convex/auth.ts` | Convex Auth with Password provider, custom profile extracts name + username on signup | Done |
 | `convex/http.ts` | Auth HTTP routes | Done |
-| `convex/lib/access.ts` | Track access policy: readTrack/requireTrack, readVersion/requireVersion, requireUserId. Roles: owner, collaborator, guest | Done |
+| `convex/lib/access.ts` | Track access policy: readTrack/requireTrack, readVersion/requireVersion, requireUserId. Roles: owner, collaborator, guest. Playlist access: readPlaylist/requirePlaylist (anyone views, creator owns) | Done |
 | `convex/lib/cascade.ts` | cascadeDelete (track → versions → comments → replies, grants; schedules R2 purge), deleteAuthRecords | Done |
 | `convex/lib/storageKeys.ts` | randomId, versionKeys, attachmentKey, isVersionKeyFor, isAttachmentKeyFor | Done |
 | `convex/lib/r2Client.ts` | S3-compatible R2 client, generateUploadUrl, generateDownloadUrl, deleteObjects | Done |
@@ -112,7 +114,7 @@
 
 ### Tests
 
-`npm test` (Vitest + convex-test, edge-runtime). `convex/access.test.ts` (visibility, guest identity, threads, storage keys), `convex/cascade.test.ts` (deletion, account deletion, claiming), `src/lib/fileTypes.test.ts`, `src/lib/queue.test.ts`. Shared helpers in `convex/test.setup.ts`.
+`npm test` (Vitest + convex-test, edge-runtime). `convex/access.test.ts` (visibility, guest identity, threads, storage keys), `convex/cascade.test.ts` (deletion, account deletion, claiming), `convex/playlists.test.ts` (playlist creation, link access, viewer role), `src/lib/fileTypes.test.ts`, `src/lib/queue.test.ts`. Shared helpers in `convex/test.setup.ts`.
 
 ---
 
@@ -160,10 +162,11 @@
 | Home | `/` | Done: compact hero section + public tracks grid (title/creator search via URL `?q=` param) + empty-state CTA; play from card queues the grid |
 | Login | `/login` | Done: email/password, sign in/sign up toggle, password visibility toggle, autocomplete attributes |
 | Track Detail | `/track/:shareableId` | Done: pinned version session state, waveform player with double-click / button timestamp commenting, comments (with accessible cross-version switch), settings menu |
+| Playlist | `/playlist/:shareableId` | Done: opens for anyone with the link; title, description, creator, share button (copies the playlist link), empty and not-found states. Renders owner copy from `viewerRole` |
 | Upload | `/upload` | Done: card-framed drop zone + form, accessible visibility radio group, progress bar, redirect |
-| Profile | `/profile` | Done: initial avatar card with inline name + email editing, responsive track header + full-width mobile filters, shared tracks section, account settings with password change, sign out, and two-mode account deletion |
+| Profile | `/profile` | Done: initial avatar card with inline name + email editing, responsive track header + full-width mobile filters, Playlists section (create, open), shared tracks section, account settings with password change, sign out, and two-mode account deletion |
 
-### Components (28 total)
+### Components (29 total)
 
 | Component | Location | Status |
 |-----------|----------|--------|
@@ -182,7 +185,8 @@
 | TrackCard | `src/components/tracks/TrackCard.tsx` | Done: reusable card for Home + Profile; subtle lift hover, play/pause button (queues `list`), stretched link, accent border when current, creator + relative time + optional privacy badge |
 | TrackDescription | `src/components/tracks/TrackDescription.tsx` | Done: preserves newlines, responsive line-clamped preview (2 lines mobile, 4 lines `sm+`) with Show more/less when overflowing |
 | VersionSelector | `src/components/tracks/VersionSelector.tsx` | Done: custom accessible select chevron with version names + dates |
-| ShareButton | `src/components/tracks/ShareButton.tsx` | Done: copies link to clipboard with toast confirmation |
+| ShareButton | `src/components/tracks/ShareButton.tsx` | Done: copies a track or playlist link (`kind` prop) to clipboard with toast confirmation |
+| CreatePlaylistModal | `src/components/playlists/CreatePlaylistModal.tsx` | Done: title + optional description form; reports the new playlist via `onCreated` |
 | TrackSettingsDropdown | `src/components/tracks/TrackSettingsDropdown.tsx` | Done: WAI-ARIA keyboard menu (visibility, collaborators, delete) with outside-click and Tab dismissal |
 | AddVersionModal | `src/components/tracks/AddVersionModal.tsx` | Done: file upload + version metadata |
 | ManageCollaboratorsModal | `src/components/tracks/ManageCollaboratorsModal.tsx` | Done: invite by email, list/remove collaborators |
@@ -198,7 +202,7 @@
 
 ### Routing (`src/App.tsx`)
 
-All routes wired: `/`, `/login`, `/track/:shareableId`, `/upload`, `/profile`, `*` (404). Wrapped in global `ErrorBoundary`. `PlayerProvider` wraps everything; `PlayerBar` renders after `<Routes>` so playback survives navigation. `Toaster` at root level, lifted above the bar while it shows.
+All routes wired: `/`, `/login`, `/track/:shareableId`, `/playlist/:shareableId`, `/upload`, `/profile`, `*` (404). Wrapped in global `ErrorBoundary`. `PlayerProvider` wraps everything; `PlayerBar` renders after `<Routes>` so playback survives navigation. `Toaster` at root level, lifted above the bar while it shows.
 
 ---
 

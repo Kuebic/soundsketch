@@ -107,6 +107,54 @@ export async function requireVersion(
   return { ...access, version };
 }
 
+/**
+ * Playlist access. A playlist is link-only: anyone holding the link may view
+ * it, and only its creator may change it. Viewing a playlist grants nothing
+ * on its tracks; each track is still resolved through readTrack (ADR 0003).
+ */
+export type PlaylistRole = "owner" | "guest";
+
+/** What the caller needs: "view" (anyone) or "own" (the creator). */
+export type PlaylistNeed = "view" | "own";
+
+export interface PlaylistAccess {
+  playlist: Doc<"playlists">;
+  userId: Id<"users"> | null;
+  role: PlaylistRole;
+}
+
+/**
+ * Resolve the viewer's access to a playlist. Returns null when the playlist
+ * does not exist or the viewer lacks `need`.
+ */
+export async function readPlaylist(
+  ctx: QueryCtx,
+  playlistOrId: Id<"playlists"> | Doc<"playlists">,
+  need: PlaylistNeed = "view",
+): Promise<PlaylistAccess | null> {
+  const playlist =
+    typeof playlistOrId === "string" ? await ctx.db.get(playlistOrId) : playlistOrId;
+  if (!playlist) return null;
+  const userId = await getAuthUserId(ctx);
+  const role: PlaylistRole = userId && playlist.creatorId === userId ? "owner" : "guest";
+  if (need === "own" && role !== "owner") return null;
+  return { playlist, userId, role };
+}
+
+/** Like readPlaylist, but throws. For mutations. */
+export async function requirePlaylist(
+  ctx: QueryCtx,
+  playlistId: Id<"playlists">,
+  need: PlaylistNeed = "view",
+): Promise<PlaylistAccess> {
+  if (need === "own" && !(await getAuthUserId(ctx))) {
+    throw new Error("Not authenticated");
+  }
+  const access = await readPlaylist(ctx, playlistId, need);
+  if (!access) throw new Error(need === "own" ? "Not authorized" : "Playlist not found");
+  return access;
+}
+
 /** The signed-in user, or throw. */
 export async function requireUserId(ctx: QueryCtx): Promise<Id<"users">> {
   const userId = await getAuthUserId(ctx);

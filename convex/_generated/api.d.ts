@@ -16,6 +16,7 @@ import type * as lib_cascade from "../lib/cascade.js";
 import type * as lib_r2Client from "../lib/r2Client.js";
 import type * as lib_rateLimit from "../lib/rateLimit.js";
 import type * as lib_storageKeys from "../lib/storageKeys.js";
+import type * as playlists from "../playlists.js";
 import type * as r2 from "../r2.js";
 import type * as storage from "../storage.js";
 import type * as tracks from "../tracks.js";
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   "lib/r2Client": typeof lib_r2Client;
   "lib/rateLimit": typeof lib_rateLimit;
   "lib/storageKeys": typeof lib_storageKeys;
+  playlists: typeof playlists;
   r2: typeof r2;
   storage: typeof storage;
   tracks: typeof tracks;

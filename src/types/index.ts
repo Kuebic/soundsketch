@@ -9,6 +9,11 @@ export type User = Doc<"users">;
 export type TrackForViewer = NonNullable<FunctionReturnType<typeof api.tracks.getByShareableId>>;
 export type TrackRole = TrackForViewer["viewerRole"];
 
+/** A playlist as seen by the current viewer, with their role on it. */
+export type PlaylistForViewer = NonNullable<FunctionReturnType<typeof api.playlists.getByShareableId>>;
+/** One of the signed-in user's playlists, as listed on their profile. */
+export type PlaylistSummary = FunctionReturnType<typeof api.playlists.getMyPlaylists>[number];
+
 /** A version as sent to clients (no storage keys). */
 export type Version = FunctionReturnType<typeof api.versions.getByTrack>[number];
 
@@ -17,6 +22,7 @@ export type CommentThread = FunctionReturnType<typeof api.comments.listThreads>[
 /** A single comment (thread root or reply), with the viewer's permissions. */
 export type CommentView = Omit<CommentThread, "replies">;
 
+export type PlaylistId = Id<"playlists">;
 export type TrackId = Id<"tracks">;
 export type VersionId = Id<"versions">;
 export type CommentId = Id<"comments">;

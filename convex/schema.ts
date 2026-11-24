@@ -97,4 +97,15 @@ export default defineSchema({
     .index("by_track", ["trackId"])
     .index("by_user", ["userId"])
     .index("by_track_and_user", ["trackId", "userId"]),
+
+  // Link-only: no visibility field, never listed or searchable (ADR 0003).
+  playlists: defineTable({
+    title: v.string(),
+    description: v.optional(v.string()),
+    creatorId: v.id("users"),
+    creatorName: v.string(), // denormalized for display
+    shareableId: v.string(), // unique short ID for URLs
+  })
+    .index("by_creator", ["creatorId"])
+    .index("by_shareable_id", ["shareableId"]),
 });

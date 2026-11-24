@@ -5,12 +5,14 @@ import { generateShareableLink } from '@/lib/utils';
 
 interface ShareButtonProps {
   shareableId: string;
+  /** What the link opens. Defaults to a track. */
+  kind?: 'track' | 'playlist';
 }
 
-export function ShareButton({ shareableId }: ShareButtonProps) {
+export function ShareButton({ shareableId, kind }: ShareButtonProps) {
   const handleCopy = async () => {
     try {
-      const link = generateShareableLink(shareableId);
+      const link = generateShareableLink(shareableId, kind);
       await navigator.clipboard.writeText(link);
       toast.success('Link copied to clipboard');
     } catch {

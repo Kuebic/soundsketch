@@ -32,9 +32,12 @@ export function formatFileSize(bytes: number): string {
 /**
  * Generate shareable link URL
  */
-export function generateShareableLink(shareableId: string): string {
+export function generateShareableLink(
+  shareableId: string,
+  kind: 'track' | 'playlist' = 'track'
+): string {
   const baseUrl = window.location.origin;
-  return `${baseUrl}/track/${shareableId}`;
+  return `${baseUrl}/${kind}/${shareableId}`;
 }
 
 /**

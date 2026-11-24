@@ -8,8 +8,9 @@ import { Navbar } from '@/components/layout/Navbar';
 import { TrackCard } from '@/components/tracks/TrackCard';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { Loader2, Music, Upload, Share2, Pencil, Settings, AlertTriangle, ChevronDown, ChevronUp, LogOut } from 'lucide-react';
+import { ListMusic, Loader2, Music, Plus, Upload, Share2, Pencil, Settings, AlertTriangle, ChevronDown, ChevronUp, LogOut } from 'lucide-react';
 import { TrackFilter } from '@/components/tracks/TrackFilter';
+import { CreatePlaylistModal } from '@/components/playlists/CreatePlaylistModal';
 
 const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-studio-accent focus-visible:ring-offset-2 focus-visible:ring-offset-studio-black';
 
@@ -21,6 +22,8 @@ export function Profile() {
   const changePassword = useAction(api.users.changePassword);
   const myTracks = useQuery(api.tracks.getMyTracks);
   const sharedTracks = useQuery(api.tracks.getSharedWithMe);
+  const myPlaylists = useQuery(api.playlists.getMyPlaylists);
+  const [createPlaylistOpen, setCreatePlaylistOpen] = useState(false);
   const navigate = useNavigate();
   const { signOut } = useAuthActions();
 
@@ -380,6 +383,64 @@ export function Profile() {
             </div>
           )}
         </section>
+
+        {/* Playlists */}
+        <section className="mt-12">
+          <div className="flex items-center justify-between gap-3 mb-6">
+            <h2 className="text-xl sm:text-2xl font-semibold flex items-center gap-2 min-w-0">
+              <ListMusic className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
+              Playlists
+              {myPlaylists && (
+                <span className="text-studio-text-secondary text-base ml-2">({myPlaylists.length})</span>
+              )}
+            </h2>
+            <Button size="sm" variant="secondary" onClick={() => setCreatePlaylistOpen(true)}>
+              <Plus className="w-4 h-4" />
+              New Playlist
+            </Button>
+          </div>
+
+          {myPlaylists === undefined ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-studio-text-secondary" />
+            </div>
+          ) : myPlaylists.length === 0 ? (
+            <div className="card text-center py-12">
+              <p className="text-studio-text-secondary">
+                No playlists yet. Create one to send several tracks with a single link.
+              </p>
+            </div>
+          ) : (
+            <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {myPlaylists.map((playlist) => (
+                <li
+                  key={playlist._id}
+                  className="card relative transition-all duration-200 hover:-translate-y-0.5 hover:border-studio-accent/50"
+                >
+                  <h3 className="font-semibold text-lg leading-snug line-clamp-1">
+                    <Link
+                      to={`/playlist/${playlist.shareableId}`}
+                      className="after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-studio-accent"
+                    >
+                      {playlist.title}
+                    </Link>
+                  </h3>
+                  {playlist.description && (
+                    <p className="text-sm text-studio-text-secondary mt-2 line-clamp-2">
+                      {playlist.description}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <CreatePlaylistModal
+          isOpen={createPlaylistOpen}
+          onClose={() => setCreatePlaylistOpen(false)}
+          onCreated={({ shareableId }) => navigate(`/playlist/${shareableId}`)}
+        />
 
         {/* Shared with Me */}
         <section className="mt-12">

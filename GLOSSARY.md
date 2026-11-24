@@ -28,6 +28,8 @@
 
 **Claim**: after signing in, a user can take ownership of the guest comments made under their anonymous identity. Unclaimed ones are permanently declined.
 
-**Queue**: the tracks the listener will hear in order, taken from the track list where they pressed play, starting at the track they picked. Each track in the queue plays its latest version. The queue ends after the last track; it does not loop.
+**Playlist**: an ordered list of tracks with an owner, a title, an optional description and its own link. URL: `/playlist/:shareableId`. Each entry is a track, not a version, so it plays the track's latest version. A playlist is link-only: anyone holding the link can open it, it is never listed on Home or in search, and only its owner can change it. The link grants no access to the tracks: a viewer sees only the tracks they have a track role on (ADR 0003).
+
+**Queue**: the tracks the listener will hear in order, taken from the track list where they pressed play (a page's track grid or a playlist), starting at the track they picked. Each track in the queue plays its latest version. The queue ends after the last track; it does not loop.
 
 **Cascade**: deleting a track, version or comment along with everything under it, including R2 files. Done only by `convex/lib/cascade.ts`.

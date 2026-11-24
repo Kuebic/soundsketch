@@ -8,6 +8,7 @@ import { usePlayer } from './hooks/usePlayer';
 import { Home } from './pages/Home';
 import { Login } from './pages/Login';
 import { TrackPage } from './pages/TrackPage';
+import { PlaylistPage } from './pages/PlaylistPage';
 import { Upload } from './pages/Upload';
 import { Profile } from './pages/Profile';
 
@@ -42,6 +43,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/track/:shareableId" element={<TrackPage />} />
+            <Route path="/playlist/:shareableId" element={<PlaylistPage />} />
             <Route path="/upload" element={<Upload />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="*" element={<div className="min-h-screen flex items-center justify-center"><div className="text-center"><h1 className="text-4xl font-bold mb-4">404</h1><p className="text-studio-text-secondary">Page not found</p></div></div>} />
