@@ -102,28 +102,55 @@ describe("cascadeDelete", () => {
 });
 
 describe("playlists", () => {
-  /** Owner's two playlists and Friend's one, all holding the populated track; "Mix" also holds a second track. */
+  /**
+   * Mix (Owner):            Song, Other, Friend's song
+   * Solo (Owner):           Song
+   * Friend's picks (Friend): Song, Friend's song
+   * Song and Other are Owner's tracks; Friend's song is Friend's.
+   */
   async function playlistsHoldingTrack() {
     const world = await populatedTrack();
     const { owner, friend, trackId } = world;
     const { trackId: other } = await owner.as.mutation(api.tracks.create, { title: "Other", visibility: "public" });
     await addVersion(owner.as, other, "o1");
+    const { trackId: friendsSong } = await friend.as.mutation(api.tracks.create, {
+      title: "Friend's song",
+      visibility: "public",
+    });
+    await addVersion(friend.as, friendsSong, "f1");
     const mix = await owner.as.mutation(api.playlists.create, { title: "Mix" });
     const solo = await owner.as.mutation(api.playlists.create, { title: "Solo" });
     const friends = await friend.as.mutation(api.playlists.create, { title: "Friend's picks" });
     for (const [client, playlistId, id] of [
       [owner.as, mix.playlistId, trackId],
       [owner.as, mix.playlistId, other],
+      [owner.as, mix.playlistId, friendsSong],
       [owner.as, solo.playlistId, trackId],
       [friend.as, friends.playlistId, trackId],
+      [friend.as, friends.playlistId, friendsSong],
     ] as const) {
       await client.mutation(api.playlists.addTrack, { playlistId, trackId: id });
     }
-    return { ...world, other, mix, solo, friends };
+    return { ...world, other, friendsSong, mix, solo, friends };
+  }
+
+  /** Every remaining entry as "playlist title > track title", sorted. */
+  async function entries(t: ReturnType<typeof setup>) {
+    return t.run(async (ctx) => {
+      const rows = await ctx.db.query("playlistTracks").collect();
+      const named = await Promise.all(
+        rows.map(async (row) => {
+          const playlist = await ctx.db.get(row.playlistId);
+          const track = await ctx.db.get(row.trackId);
+          return `${playlist?.title ?? "(deleted playlist)"} > ${track?.title ?? "(deleted track)"}`;
+        }),
+      );
+      return named.sort();
+    });
   }
 
   test("deleting a playlist removes its entries, kills its link, and leaves tracks and other playlists alone", async () => {
-    const { t, owner, mix, solo } = await playlistsHoldingTrack();
+    const { t, owner, mix } = await playlistsHoldingTrack();
     const before = await count(t);
 
     await owner.as.mutation(api.playlists.deletePlaylist, { playlistId: mix.playlistId });
@@ -131,11 +158,14 @@ describe("playlists", () => {
     expect(await count(t)).toEqual({
       ...before,
       playlists: before.playlists - 1,
-      playlistTracks: before.playlistTracks - 2,
+      playlistTracks: before.playlistTracks - 3,
     });
+    expect(await entries(t)).toEqual([
+      "Friend's picks > Friend's song",
+      "Friend's picks > Song",
+      "Solo > Song",
+    ]);
     expect(await t.query(api.playlists.getByShareableId, { shareableId: mix.shareableId })).toBeNull();
-    const kept = await t.query(api.playlists.getByShareableId, { shareableId: solo.shareableId });
-    expect(kept?.tracks.map((track) => track.title)).toEqual(["Song"]);
     expect(await scheduledDeletes(t)).toEqual([]);
   });
 
@@ -154,34 +184,41 @@ describe("playlists", () => {
   });
 
   test("deleting a track removes it from every playlist and leaves the playlists", async () => {
-    const { t, owner, trackId, mix, solo, friends } = await playlistsHoldingTrack();
+    const { t, owner, trackId, solo } = await playlistsHoldingTrack();
 
     await owner.as.mutation(api.tracks.deleteTrack, { trackId });
 
-    expect(await count(t)).toMatchObject({ playlists: 3, playlistTracks: 1 });
-    const seen = async (shareableId: string) => {
-      const playlist = await t.query(api.playlists.getByShareableId, { shareableId });
-      return playlist && { titles: playlist.tracks.map((track) => track.title), hidden: playlist.hiddenCount };
-    };
-    expect(await seen(mix.shareableId)).toEqual({ titles: ["Other"], hidden: 0 });
-    expect(await seen(solo.shareableId)).toEqual({ titles: [], hidden: 0 });
-    expect(await seen(friends.shareableId)).toEqual({ titles: [], hidden: 0 });
-  });
-
-  test("deleting an account removes its playlists and drops its tracks from other people's", async () => {
-    const { t, owner, mix, solo, friends } = await playlistsHoldingTrack();
-
-    await owner.as.mutation(api.users.deleteAccount, { deletionMode: "delete_everything" });
-
-    expect(await count(t)).toMatchObject({ playlists: 1, playlistTracks: 0 });
-    expect(await t.query(api.playlists.getByShareableId, { shareableId: mix.shareableId })).toBeNull();
-    expect(await t.query(api.playlists.getByShareableId, { shareableId: solo.shareableId })).toBeNull();
-    expect(await t.query(api.playlists.getByShareableId, { shareableId: friends.shareableId })).toMatchObject({
-      title: "Friend's picks",
+    expect((await count(t)).playlists).toBe(3);
+    expect(await entries(t)).toEqual([
+      "Friend's picks > Friend's song",
+      "Mix > Friend's song",
+      "Mix > Other",
+    ]);
+    expect(await t.query(api.playlists.getByShareableId, { shareableId: solo.shareableId })).toMatchObject({
       tracks: [],
       hiddenCount: 0,
     });
   });
+
+  test.each(["keep_comments", "delete_everything"] as const)(
+    "deleting an account (%s) removes its playlists and drops its tracks from other people's",
+    async (deletionMode) => {
+      const { t, owner, friendsSong, mix, solo, friends } = await playlistsHoldingTrack();
+
+      await owner.as.mutation(api.users.deleteAccount, { deletionMode });
+
+      // Owner's playlists are gone with every entry in them, including the one
+      // for Friend's track; Friend's track and their own entry for it survive.
+      expect((await count(t)).playlists).toBe(1);
+      expect(await entries(t)).toEqual(["Friend's picks > Friend's song"]);
+      expect(await t.run((ctx) => ctx.db.get(friendsSong))).not.toBeNull();
+      expect(await t.query(api.playlists.getByShareableId, { shareableId: mix.shareableId })).toBeNull();
+      expect(await t.query(api.playlists.getByShareableId, { shareableId: solo.shareableId })).toBeNull();
+      const kept = await t.query(api.playlists.getByShareableId, { shareableId: friends.shareableId });
+      expect(kept?.tracks.map((track) => [track.title, track.duration])).toEqual([["Friend's song", 60]]);
+      expect(kept?.hiddenCount).toBe(0);
+    },
+  );
 });
 
 describe("deleteAccount", () => {

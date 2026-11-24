@@ -95,6 +95,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const token = loadTokenRef.current;
     retriedRef.current = false;
     audio.pause();
+    // Drop the previous item's media, so a failed load cannot leave the bar
+    // replaying the last track under this one's name.
+    audio.removeAttribute('src');
+    audio.load();
     setCurrentTime(0);
     setDuration(0);
 
@@ -209,6 +213,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (target === 'restart') {
       audio.currentTime = 0;
       setCurrentTime(0);
+      setQueueState((s) => (s.ended ? { ...s, ended: false } : s));
     } else {
       setQueueState((s) => ({ ...s, index: target, playId: s.playId + 1, ended: false }));
     }
@@ -218,6 +223,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     (seconds: number) => {
       audio.currentTime = seconds;
       setCurrentTime(seconds);
+      // Scrubbing back into a finished last track makes it resumable again.
+      setQueueState((s) => (s.ended ? { ...s, ended: false } : s));
     },
     [audio]
   );

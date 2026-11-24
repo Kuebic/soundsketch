@@ -14,7 +14,7 @@ A web app for musicians to share demo tracks with collaborators. Think SoundClou
 ```
 ├── convex/          # Convex backend (schema, queries, mutations, R2 actions)
 │   ├── lib/access.ts      # Track access policy — every function asks it
-│   ├── lib/cascade.ts     # The only code that deletes tracks/versions/comments
+│   ├── lib/cascade.ts     # The only code that deletes tracks/versions/comments/playlists
 │   ├── lib/storageKeys.ts # R2 key minting + prefix checks
 │   ├── storage.ts         # Internal queries: authorize file access by id
 │   └── r2.ts              # Node actions: signed URLs by versionId/commentId

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useRef, useState } from 'react';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from 'convex/react';
 import { toast } from 'sonner';
 import { ArrowDown, ArrowUp, EyeOff, ListMusic, Loader2, Pause, Pencil, Play, Trash2, X } from 'lucide-react';
@@ -27,6 +27,9 @@ export function PlaylistPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const pathRef = useRef(location.pathname);
+  pathRef.current = location.pathname;
   const { shareableId } = useParams<{ shareableId: string }>();
   const playlist = useQuery(
     api.playlists.getByShareableId,
@@ -228,10 +231,10 @@ export function PlaylistPage() {
                     >
                       {track.title}
                     </Link>
-                    <p className="truncate text-xs text-studio-text-secondary">
-                      {track.creatorName}
+                    <p className="flex min-w-0 text-xs text-studio-text-secondary">
+                      <span className="truncate">{track.creatorName}</span>
                       {isOwner && (
-                        <span className="mono sm:hidden">
+                        <span className="mono shrink-0 whitespace-pre sm:hidden">
                           {' · '}
                           {track.duration === null ? 'No audio' : formatDuration(track.duration)}
                         </span>
@@ -296,7 +299,10 @@ export function PlaylistPage() {
           <DeletePlaylistModal
             playlist={playlist}
             onClose={() => setDeletingId(null)}
-            onDeleted={() => navigate('/profile')}
+            onDeleted={() => {
+              // Only if the owner is still here; they may have left mid-delete.
+              if (pathRef.current === `/playlist/${playlist.shareableId}`) navigate('/profile');
+            }}
           />
         )}
       </main>

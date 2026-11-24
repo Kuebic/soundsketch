@@ -12,7 +12,7 @@ import { ListMusic, Loader2, Music, Plus, Trash2, Upload, Share2, Pencil, Settin
 import { TrackFilter } from '@/components/tracks/TrackFilter';
 import { CreatePlaylistModal } from '@/components/playlists/CreatePlaylistModal';
 import { DeletePlaylistModal } from '@/components/playlists/DeletePlaylistModal';
-import type { PlaylistSummary } from '@/types';
+import type { PlaylistId } from '@/types';
 
 const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-studio-accent focus-visible:ring-offset-2 focus-visible:ring-offset-studio-black';
 
@@ -26,7 +26,10 @@ export function Profile() {
   const sharedTracks = useQuery(api.tracks.getSharedWithMe);
   const myPlaylists = useQuery(api.playlists.getMyPlaylists);
   const [createPlaylistOpen, setCreatePlaylistOpen] = useState(false);
-  const [playlistToDelete, setPlaylistToDelete] = useState<PlaylistSummary | null>(null);
+  // Resolved against the live list, so the dialog shows the current title and
+  // closes by itself if the playlist is deleted elsewhere.
+  const [playlistToDeleteId, setPlaylistToDeleteId] = useState<PlaylistId | null>(null);
+  const playlistToDelete = myPlaylists?.find((p) => p._id === playlistToDeleteId);
   const navigate = useNavigate();
   const { signOut } = useAuthActions();
 
@@ -431,7 +434,7 @@ export function Profile() {
                     </h3>
                     <button
                       type="button"
-                      onClick={() => setPlaylistToDelete(playlist)}
+                      onClick={() => setPlaylistToDeleteId(playlist._id)}
                       aria-label={`Delete playlist ${playlist.title}`}
                       title="Delete playlist"
                       className={`relative z-10 shrink-0 -mr-1 -mt-1 p-2 rounded-lg text-studio-text-secondary hover:text-red-400 hover:bg-studio-dark transition-colors ${FOCUS_RING}`}
@@ -463,7 +466,7 @@ export function Profile() {
           <DeletePlaylistModal
             key={playlistToDelete._id}
             playlist={playlistToDelete}
-            onClose={() => setPlaylistToDelete(null)}
+            onClose={() => setPlaylistToDeleteId(null)}
           />
         )}
 
