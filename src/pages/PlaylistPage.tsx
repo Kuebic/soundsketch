@@ -1,13 +1,16 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from 'convex/react';
-import { EyeOff, ListMusic, Loader2 } from 'lucide-react';
+import { EyeOff, ListMusic, Loader2, Pause, Play } from 'lucide-react';
 import { api } from '../../convex/_generated/api';
 import { Navbar } from '@/components/layout/Navbar';
 import { ShareButton } from '@/components/tracks/ShareButton';
 import { TrackDescription } from '@/components/tracks/TrackDescription';
-import { formatDuration } from '@/lib/utils';
+import { Button } from '@/components/ui/Button';
+import { usePlayer } from '@/hooks/usePlayer';
+import { cn, formatDuration } from '@/lib/utils';
 
 export function PlaylistPage() {
+  const player = usePlayer();
   const { shareableId } = useParams<{ shareableId: string }>();
   const playlist = useQuery(
     api.playlists.getByShareableId,
@@ -46,6 +49,17 @@ export function PlaylistPage() {
   const { tracks, hiddenCount } = playlist;
   const totalDuration = tracks.reduce((sum, track) => sum + (track.duration ?? 0), 0);
 
+  // The queue is built from this list; it skips tracks with no audio, so
+  // Play only has to find the first one that has some.
+  const firstPlayable = tracks.find((track) => track.latestVersionId);
+  const currentInList = tracks.some((track) => track._id === player.current?.trackId);
+  const playingHere = currentInList && player.isPlaying;
+
+  const handlePlayAll = () => {
+    if (currentInList) player.toggle();
+    else if (firstPlayable) player.playFrom(tracks, firstPlayable._id);
+  };
+
   return (
     <div className="min-h-screen">
       <Navbar />
@@ -79,6 +93,12 @@ export function PlaylistPage() {
           {playlist.description && (
             <TrackDescription description={playlist.description} className="mt-2" />
           )}
+          {firstPlayable && (
+            <Button size="lg" onClick={handlePlayAll} className="mt-4 w-full sm:w-auto">
+              {playingHere ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+              {playingHere ? 'Pause' : currentInList ? 'Resume' : 'Play'}
+            </Button>
+          )}
         </div>
 
         {tracks.length === 0 ? (
@@ -94,25 +114,62 @@ export function PlaylistPage() {
           </div>
         ) : (
           <ol className="card p-0 divide-y divide-studio-gray overflow-hidden">
-            {tracks.map((track, index) => (
-              <li key={track._id} className="flex items-center gap-3 px-3 py-2.5 sm:px-4">
-                <span className="mono w-6 shrink-0 text-right text-xs text-studio-text-secondary">
-                  {index + 1}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <Link
-                    to={`/track/${track.shareableId}`}
-                    className="block truncate font-medium hover:text-studio-accent focus-visible:outline-none focus-visible:text-studio-accent"
+            {tracks.map((track, index) => {
+              const isCurrent = player.current?.trackId === track._id;
+              const isPlaying = isCurrent && player.isPlaying;
+              const canPlay = !!track.latestVersionId;
+              return (
+                <li
+                  key={track._id}
+                  aria-current={isCurrent ? 'true' : undefined}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2.5 sm:px-4',
+                    isCurrent && 'bg-studio-accent/10'
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => (isCurrent ? player.toggle() : player.playFrom(tracks, track._id))}
+                    disabled={!canPlay}
+                    aria-label={isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
+                    title={canPlay ? undefined : 'No audio yet'}
+                    className={cn(
+                      'group shrink-0 w-8 h-8 flex items-center justify-center rounded-full mono text-xs',
+                      'text-studio-text-secondary hover:bg-studio-accent hover:text-white transition-colors',
+                      'disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-studio-text-secondary',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-studio-accent',
+                      isCurrent && 'bg-studio-accent text-white'
+                    )}
                   >
-                    {track.title}
-                  </Link>
-                  <p className="truncate text-xs text-studio-text-secondary">{track.creatorName}</p>
-                </div>
-                <span className="mono shrink-0 text-xs text-studio-text-secondary">
-                  {track.duration === null ? 'No audio' : formatDuration(track.duration)}
-                </span>
-              </li>
-            ))}
+                    {isCurrent ? (
+                      isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />
+                    ) : canPlay ? (
+                      <>
+                        <span className="group-hover:hidden group-focus-visible:hidden">{index + 1}</span>
+                        <Play className="hidden w-4 h-4 ml-0.5 group-hover:block group-focus-visible:block" />
+                      </>
+                    ) : (
+                      index + 1
+                    )}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <Link
+                      to={`/track/${track.shareableId}`}
+                      className={cn(
+                        'block truncate font-medium hover:text-studio-accent focus-visible:outline-none focus-visible:text-studio-accent',
+                        isCurrent && 'text-studio-accent'
+                      )}
+                    >
+                      {track.title}
+                    </Link>
+                    <p className="truncate text-xs text-studio-text-secondary">{track.creatorName}</p>
+                  </div>
+                  <span className="mono shrink-0 text-xs text-studio-text-secondary">
+                    {track.duration === null ? 'No audio' : formatDuration(track.duration)}
+                  </span>
+                </li>
+              );
+            })}
           </ol>
         )}
 

@@ -55,7 +55,7 @@
 | Show comments across versions | Done | `includeAllVersions` param in queries, toggle in `TrackPage` |
 | Responsive design | Done | Tailwind responsive classes throughout |
 | Loading states + error handling | Done | Conditional rendering, error boundaries, toast notifications |
-| Play from track lists + queue | Done | Play button on every `TrackCard` (Home, Profile); queues the rest of that list (latest versions, skips tracks with no version, stops at the end). `PlayerProvider` + `PlayerBar` keep playing across pages. Only one player sounds at a time (`src/lib/audioFocus.ts`) |
+| Play from track lists + queue | Done | Play button on every `TrackCard` (Home, Profile) and on a playlist page and its rows; queues the rest of that list (latest versions, skips tracks with no version, stops at the end). `PlayerProvider` + `PlayerBar` keep playing across pages. Only one player sounds at a time (`src/lib/audioFocus.ts`) |
 | Dark mode theming | Done | `studio.*` color palette, Space Mono + Inter fonts |
 
 ### Phase 4: Collaboration Features — Partially Complete
@@ -163,7 +163,7 @@
 | Home | `/` | Done: compact hero section + public tracks grid (title/creator search via URL `?q=` param) + empty-state CTA; play from card queues the grid |
 | Login | `/login` | Done: email/password, sign in/sign up toggle, password visibility toggle, autocomplete attributes |
 | Track Detail | `/track/:shareableId` | Done: pinned version session state, waveform player with double-click / button timestamp commenting, comments (with accessible cross-version switch), settings menu |
-| Playlist | `/playlist/:shareableId` | Done: opens for anyone with the link; title, description, creator, track count + total duration, ordered track list (duration, link to track page), "N tracks unavailable" note, share button (copies the playlist link), empty and not-found states. Renders owner copy from `viewerRole` |
+| Playlist | `/playlist/:shareableId` | Done: opens for anyone with the link; title, description, creator, track count + total duration, Play button (queues the list from the first track with audio via `usePlayer().playFrom`; Pause/Resume while one of its tracks is current), ordered track list (per-row play from that track, now-playing mark, duration, link to track page), "N tracks unavailable" note, share button (copies the playlist link), empty and not-found states. Renders owner copy from `viewerRole` |
 | Upload | `/upload` | Done: card-framed drop zone + form, accessible visibility radio group, progress bar, redirect |
 | Profile | `/profile` | Done: initial avatar card with inline name + email editing, responsive track header + full-width mobile filters, Playlists section (create, open), shared tracks section, account settings with password change, sign out, and two-mode account deletion |
 
