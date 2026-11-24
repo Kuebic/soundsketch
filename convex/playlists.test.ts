@@ -324,3 +324,107 @@ describe("tracks in a playlist are resolved for each viewer", () => {
     expect(JSON.stringify(playlist)).not.toContain("a-stream.mp3");
   });
 });
+
+describe("the owner edits a playlist", () => {
+  async function playlistOf(titles: string[]) {
+    const t = setup();
+    const owner = await signIn(t, "Owner");
+    const stranger = await signIn(t, "Stranger");
+    const { playlistId, shareableId } = await owner.as.mutation(api.playlists.create, {
+      title: "Mix",
+      description: "First draft",
+    });
+    const ids: Record<string, Awaited<ReturnType<typeof createTrack>>> = {};
+    for (const title of titles) {
+      ids[title] = await createTrack(owner.as, title, "public");
+      await owner.as.mutation(api.playlists.addTrack, { playlistId, trackId: ids[title] });
+    }
+    return { t, owner, stranger, playlistId, shareableId, ids };
+  }
+
+  test("renames it and edits its description; recipients see the change", async () => {
+    const { t, owner, playlistId, shareableId } = await playlistOf([]);
+
+    await owner.as.mutation(api.playlists.update, { playlistId, title: "  Final mixes " });
+    expect(await t.query(api.playlists.getByShareableId, { shareableId })).toMatchObject({
+      title: "Final mixes",
+      description: "First draft",
+    });
+
+    await owner.as.mutation(api.playlists.update, { playlistId, description: "   " });
+    const cleared = await t.query(api.playlists.getByShareableId, { shareableId });
+    expect(cleared?.title).toBe("Final mixes");
+    expect(cleared?.description).toBeUndefined();
+
+    await expect(
+      owner.as.mutation(api.playlists.update, { playlistId, title: " " }),
+    ).rejects.toThrow("Title cannot be empty");
+  });
+
+  test("moves a track up or down one place", async () => {
+    const { t, owner, playlistId, shareableId, ids } = await playlistOf(["A", "B", "C"]);
+
+    await owner.as.mutation(api.playlists.moveTrack, { playlistId, trackId: ids.C, direction: "up" });
+    expect(await titlesSeenBy(t, shareableId)).toEqual(["A", "C", "B"]);
+
+    await owner.as.mutation(api.playlists.moveTrack, { playlistId, trackId: ids.A, direction: "down" });
+    expect(await titlesSeenBy(t, shareableId)).toEqual(["C", "A", "B"]);
+  });
+
+  test("the first track cannot move up and the last cannot move down", async () => {
+    const { t, owner, playlistId, shareableId, ids } = await playlistOf(["A", "B", "C"]);
+
+    await owner.as.mutation(api.playlists.moveTrack, { playlistId, trackId: ids.A, direction: "up" });
+    await owner.as.mutation(api.playlists.moveTrack, { playlistId, trackId: ids.C, direction: "down" });
+
+    expect(await titlesSeenBy(t, shareableId)).toEqual(["A", "B", "C"]);
+  });
+
+  test("a move steps over an entry the owner cannot see, so it always changes what they see", async () => {
+    const t = setup();
+    const owner = await signIn(t, "Owner");
+    const musician = await signIn(t, "Musician");
+    const { playlistId, shareableId } = await owner.as.mutation(api.playlists.create, { title: "Mix" });
+    const a = await createTrack(owner.as, "A", "public");
+    const lost = await createTrack(musician.as, "Lost", "private");
+    const b = await createTrack(owner.as, "B", "public");
+    await musician.as.mutation(api.tracks.grantAccess, { trackId: lost, userId: owner.userId });
+    for (const trackId of [a, lost, b]) {
+      await owner.as.mutation(api.playlists.addTrack, { playlistId, trackId });
+    }
+    await musician.as.mutation(api.tracks.revokeAccess, { trackId: lost, userId: owner.userId });
+
+    await owner.as.mutation(api.playlists.moveTrack, { playlistId, trackId: b, direction: "up" });
+
+    expect(await titlesSeenBy(owner.as, shareableId)).toEqual(["B", "A"]);
+  });
+
+  test("removes a track from the playlist and leaves the track itself alone", async () => {
+    const { t, owner, playlistId, shareableId, ids } = await playlistOf(["A", "B", "C"]);
+
+    await owner.as.mutation(api.playlists.removeTrack, { playlistId, trackId: ids.B });
+
+    expect(await titlesSeenBy(t, shareableId)).toEqual(["A", "C"]);
+    const mine = await owner.as.query(api.tracks.getMyTracks, {});
+    expect(mine.map((track) => track.title).sort()).toEqual(["A", "B", "C"]);
+
+    // It can go back in, at the end.
+    await owner.as.mutation(api.playlists.addTrack, { playlistId, trackId: ids.B });
+    expect(await titlesSeenBy(t, shareableId)).toEqual(["A", "C", "B"]);
+  });
+
+  test("nobody else can rename, reorder or remove", async () => {
+    const { t, stranger, playlistId, shareableId, ids } = await playlistOf(["A", "B"]);
+    const attempts = (client: Pick<Client, "mutation">) => [
+      client.mutation(api.playlists.update, { playlistId, title: "Hijacked" }),
+      client.mutation(api.playlists.moveTrack, { playlistId, trackId: ids.B, direction: "up" }),
+      client.mutation(api.playlists.removeTrack, { playlistId, trackId: ids.A }),
+    ];
+
+    for (const attempt of attempts(stranger.as)) await expect(attempt).rejects.toThrow("Not authorized");
+    for (const attempt of attempts(t)) await expect(attempt).rejects.toThrow("Not authenticated");
+
+    expect(await t.query(api.playlists.getByShareableId, { shareableId })).toMatchObject({ title: "Mix" });
+    expect(await titlesSeenBy(t, shareableId)).toEqual(["A", "B"]);
+  });
+});

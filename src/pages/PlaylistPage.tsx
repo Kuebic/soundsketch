@@ -1,17 +1,27 @@
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from 'convex/react';
-import { EyeOff, ListMusic, Loader2, Pause, Play } from 'lucide-react';
+import { useMutation, useQuery } from 'convex/react';
+import { toast } from 'sonner';
+import { ArrowDown, ArrowUp, EyeOff, ListMusic, Loader2, Pause, Pencil, Play, X } from 'lucide-react';
 import { api } from '../../convex/_generated/api';
 import { Navbar } from '@/components/layout/Navbar';
 import { ShareButton } from '@/components/tracks/ShareButton';
 import { TrackDescription } from '@/components/tracks/TrackDescription';
+import { EditPlaylistModal } from '@/components/playlists/EditPlaylistModal';
 import { Button } from '@/components/ui/Button';
 import { usePlayer } from '@/hooks/usePlayer';
 import { isQueueFrom } from '@/lib/queue';
 import { cn, formatDuration } from '@/lib/utils';
+import type { TrackId } from '@/types';
+
+const rowActionClass =
+  'p-1.5 rounded-lg text-studio-text-secondary hover:text-white hover:bg-studio-dark transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-studio-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-studio-accent';
 
 export function PlaylistPage() {
   const player = usePlayer();
+  const moveTrack = useMutation(api.playlists.moveTrack);
+  const removeTrack = useMutation(api.playlists.removeTrack);
+  const [editing, setEditing] = useState(false);
   const { shareableId } = useParams<{ shareableId: string }>();
   const playlist = useQuery(
     api.playlists.getByShareableId,
@@ -65,6 +75,23 @@ export function PlaylistPage() {
   const canToggle = queuedHere && !finished;
   const playingHere = queuedHere && player.isPlaying;
 
+  const playlistId = playlist._id;
+  const handleMove = async (trackId: TrackId, direction: 'up' | 'down') => {
+    try {
+      await moveTrack({ playlistId, trackId, direction });
+    } catch {
+      toast.error('Failed to move track');
+    }
+  };
+  const handleRemove = async (trackId: TrackId, title: string) => {
+    try {
+      await removeTrack({ playlistId, trackId });
+      toast.success(`Removed ${title}`);
+    } catch {
+      toast.error('Failed to remove track');
+    }
+  };
+
   const handlePlayAll = () => {
     if (canToggle) player.toggle();
     else if (firstPlayable) player.playFrom(tracks, firstPlayable._id);
@@ -98,6 +125,17 @@ export function PlaylistPage() {
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <ShareButton shareableId={playlist.shareableId} kind="playlist" />
+              {isOwner && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setEditing(true)}
+                  aria-label="Edit playlist"
+                  title="Edit playlist"
+                >
+                  <Pencil className="w-4 h-4" />
+                </Button>
+              )}
             </div>
           </div>
           {playlist.description && (
@@ -176,9 +214,44 @@ export function PlaylistPage() {
                     </Link>
                     <p className="truncate text-xs text-studio-text-secondary">{track.creatorName}</p>
                   </div>
-                  <span className="mono shrink-0 text-xs text-studio-text-secondary">
+                  <span
+                    className={cn(
+                      'mono shrink-0 text-xs text-studio-text-secondary',
+                      isOwner && 'hidden sm:inline'
+                    )}
+                  >
                     {track.duration === null ? 'No audio' : formatDuration(track.duration)}
                   </span>
+                  {isOwner && (
+                    <div className="flex shrink-0 items-center">
+                      <button
+                        type="button"
+                        onClick={() => handleMove(track._id, 'up')}
+                        disabled={index === 0}
+                        aria-label={`Move ${track.title} up`}
+                        className={rowActionClass}
+                      >
+                        <ArrowUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleMove(track._id, 'down')}
+                        disabled={index === tracks.length - 1}
+                        aria-label={`Move ${track.title} down`}
+                        className={rowActionClass}
+                      >
+                        <ArrowDown className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemove(track._id, track.title)}
+                        aria-label={`Remove ${track.title} from playlist`}
+                        className={cn(rowActionClass, 'hover:text-red-400')}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -191,6 +264,8 @@ export function PlaylistPage() {
             {hiddenCount} {hiddenCount === 1 ? 'track is' : 'tracks are'} unavailable to you.
           </p>
         )}
+
+        {editing && <EditPlaylistModal playlist={playlist} onClose={() => setEditing(false)} />}
       </main>
     </div>
   );

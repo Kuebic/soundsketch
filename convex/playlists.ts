@@ -153,3 +153,68 @@ export const addTrack = mutation({
     });
   },
 });
+
+/**
+ * Update a playlist's title and description. Omitted fields are left unchanged.
+ */
+export const update = mutation({
+  args: {
+    playlistId: v.id("playlists"),
+    title: v.optional(v.string()),
+    description: v.optional(v.string()),
+  },
+  handler: async (ctx, { playlistId, ...fields }) => {
+    await requirePlaylist(ctx, playlistId, "own");
+    await ctx.db.patch(playlistId, {
+      ...(fields.title !== undefined && { title: cleanTitle(fields.title) }),
+      ...(fields.description !== undefined && {
+        description: fields.description.trim() || undefined,
+      }),
+    });
+  },
+});
+
+/**
+ * Move a track one place up or down by swapping it with its neighbour.
+ * The neighbour is the nearest entry the owner can see, so a move always
+ * changes the order on their page. Does nothing at the ends of the list.
+ */
+export const moveTrack = mutation({
+  args: {
+    playlistId: v.id("playlists"),
+    trackId: v.id("tracks"),
+    direction: v.union(v.literal("up"), v.literal("down")),
+  },
+  handler: async (ctx, args) => {
+    await requirePlaylist(ctx, args.playlistId, "own");
+
+    const entries = await entriesOf(ctx, args.playlistId);
+    const from = entries.findIndex((entry) => entry.trackId === args.trackId);
+    if (from === -1) throw new Error("Track is not in this playlist");
+
+    const step = args.direction === "up" ? -1 : 1;
+    for (let i = from + step; i >= 0 && i < entries.length; i += step) {
+      if (!(await readTrack(ctx, entries[i].trackId))) continue;
+      await ctx.db.patch(entries[from]._id, { position: entries[i].position });
+      await ctx.db.patch(entries[i]._id, { position: entries[from].position });
+      return;
+    }
+  },
+});
+
+/**
+ * Take a track out of a playlist. The track itself is untouched.
+ */
+export const removeTrack = mutation({
+  args: {
+    playlistId: v.id("playlists"),
+    trackId: v.id("tracks"),
+  },
+  handler: async (ctx, args) => {
+    await requirePlaylist(ctx, args.playlistId, "own");
+    const entries = await entriesOf(ctx, args.playlistId);
+    for (const entry of entries) {
+      if (entry.trackId === args.trackId) await ctx.db.delete(entry._id);
+    }
+  },
+});
