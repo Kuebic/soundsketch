@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from 'convex/react';
 import { toast } from 'sonner';
-import { ArrowDown, ArrowUp, EyeOff, ListMusic, Loader2, Pause, Pencil, Play, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, EyeOff, ListMusic, Loader2, Pause, Pencil, Play, Trash2, X } from 'lucide-react';
 import { api } from '../../convex/_generated/api';
 import { Navbar } from '@/components/layout/Navbar';
 import { ShareButton } from '@/components/tracks/ShareButton';
@@ -22,6 +22,7 @@ export function PlaylistPage() {
   const player = usePlayer();
   const moveTrack = useMutation(api.playlists.moveTrack);
   const removeTrack = useMutation(api.playlists.removeTrack);
+  const updateTrackSettings = useMutation(api.tracks.updateSettings);
   // Holds the id of the playlist being edited, so the form cannot follow a
   // route change to another playlist.
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -66,6 +67,8 @@ export function PlaylistPage() {
 
   const isOwner = playlist.viewerRole === 'owner';
   const { tracks, hiddenCount } = playlist;
+  // Sent to the owner only; absent for everyone else.
+  const privateTracks = playlist.privateTracks ?? [];
   const totalDuration = tracks.reduce((sum, track) => sum + (track.duration ?? 0), 0);
 
   // The queue is built from this list; it skips tracks with no audio, so
@@ -93,6 +96,15 @@ export function PlaylistPage() {
       toast.success(`Removed ${title}`);
     } catch {
       toast.error('Failed to remove track');
+    }
+  };
+
+  const handleMakeUnlisted = async (trackId: TrackId, title: string) => {
+    try {
+      await updateTrackSettings({ trackId, visibility: 'unlisted' });
+      toast.success(`${title} is now unlisted`);
+    } catch {
+      toast.error('Failed to update visibility');
     }
   };
 
@@ -164,6 +176,40 @@ export function PlaylistPage() {
             </Button>
           )}
         </div>
+
+        {privateTracks.length > 0 && (
+          <div
+            role="status"
+            className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 sm:p-4"
+          >
+            <p className="flex items-start gap-2 text-sm font-medium text-amber-200">
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+              {privateTracks.length === 1
+                ? '1 track is private. People you send this link to won’t see or hear it unless they already have access.'
+                : `${privateTracks.length} tracks are private. People you send this link to won’t see or hear them unless they already have access.`}
+            </p>
+            <ul className="mt-3 space-y-2">
+              {privateTracks.map((track) => (
+                <li key={track.trackId} className="flex items-center gap-3 text-sm">
+                  <span className="flex-1 min-w-0 truncate">{track.title}</span>
+                  {track.canMakeUnlisted ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleMakeUnlisted(track.trackId, track.title)}
+                    >
+                      Make unlisted
+                    </Button>
+                  ) : (
+                    <span className="shrink-0 text-xs text-studio-text-secondary">
+                      Owned by {track.creatorName}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {tracks.length === 0 ? (
           <div className="card text-center py-12">

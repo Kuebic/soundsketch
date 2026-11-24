@@ -17,6 +17,6 @@ Doing that would make the playlist link a second way into a private track, next 
 
 ## Consequences
 
-- A playlist of private demos looks almost empty to a recipient. The owner is warned on the playlist page about private tracks and can make the ones they own unlisted in one click.
+- A playlist of private demos looks almost empty to a recipient. The owner is warned on the playlist page about private tracks and can make the ones they own unlisted in one click. That list (`privateTracks`) is returned to the playlist owner only, and only for tracks they themselves can see.
 - The hidden count tells a viewer that the playlist holds something they cannot see, but not which track or whose.
 - If this proves too painful, the change is a new route to a track role in `access.ts` (for example "listener via playlist"), not a bypass in the playlist query.

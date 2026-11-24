@@ -76,6 +76,7 @@ export const getMyPlaylists = query({
 /**
  * Get a playlist by shareable ID, with the viewer's role on it.
  * Anyone holding the link may open it. Returns null if it doesn't exist.
+ * The owner also gets `privateTracks`, to warn them before they send the link.
  */
 export const getByShareableId = query({
   args: { shareableId: v.string() },
@@ -94,6 +95,9 @@ export const getByShareableId = query({
     // for this viewer, and those they have no role on are only counted.
     const tracks = [];
     let hiddenCount = 0;
+    // For the playlist owner only: the private tracks among those they can
+    // see, which most recipients will not hear.
+    const privateTracks = [];
     for (const entry of await entriesOf(ctx, playlist._id)) {
       const trackAccess = await readTrack(ctx, entry.trackId);
       if (!trackAccess) {
@@ -101,6 +105,14 @@ export const getByShareableId = query({
         continue;
       }
       const { track } = trackAccess;
+      if (track.visibility === "private") {
+        privateTracks.push({
+          trackId: track._id,
+          title: track.title,
+          creatorName: track.creatorName,
+          canMakeUnlisted: trackAccess.role === "owner",
+        });
+      }
       const latest = track.latestVersionId && (await ctx.db.get(track.latestVersionId));
       tracks.push({ ...track, duration: latest ? latest.duration : null });
     }
@@ -114,6 +126,7 @@ export const getByShareableId = query({
       viewerRole: role,
       tracks,
       hiddenCount,
+      ...(role === "owner" && { privateTracks }),
     };
   },
 });

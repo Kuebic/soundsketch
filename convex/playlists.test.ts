@@ -285,6 +285,7 @@ describe("tracks in a playlist are resolved for each viewer", () => {
       viewerRole: "owner",
       tracks: [expect.objectContaining({ _id: mine, title: "Mine", creatorName: "Owner", duration: 60 })],
       hiddenCount: 1,
+      privateTracks: [],
     });
     expect(Object.keys(playlist!.tracks[0]).sort()).toEqual(
       [
@@ -454,5 +455,70 @@ describe("the owner edits a playlist", () => {
     await owner.as.mutation(api.playlists.removeTrack, { playlistId, trackId: theirs });
     expect(await titlesSeenBy(t, shareableId)).toEqual(["A"]);
     expect(ids.A).toBeDefined();
+  });
+});
+
+describe("the owner is told which tracks recipients may not hear", () => {
+  async function playlistWithPrivateTracks() {
+    const t = setup();
+    const owner = await signIn(t, "Owner");
+    const musician = await signIn(t, "Musician");
+    const stranger = await signIn(t, "Stranger");
+    const { playlistId, shareableId } = await owner.as.mutation(api.playlists.create, { title: "Mix" });
+    const open = await createTrack(owner.as, "Open", "public");
+    const mine = await createTrack(owner.as, "My private", "private");
+    const theirs = await createTrack(musician.as, "Their private", "private");
+    const linked = await createTrack(owner.as, "Linked", "unlisted");
+    await musician.as.mutation(api.tracks.grantAccess, { trackId: theirs, userId: owner.userId });
+    for (const trackId of [open, mine, theirs, linked]) {
+      await owner.as.mutation(api.playlists.addTrack, { playlistId, trackId });
+    }
+    return { t, owner, musician, stranger, shareableId, mine, theirs };
+  }
+
+  test("private tracks are listed for the owner, with whether they can change each one", async () => {
+    const { owner, shareableId, mine, theirs } = await playlistWithPrivateTracks();
+
+    const playlist = await owner.as.query(api.playlists.getByShareableId, { shareableId });
+
+    expect(playlist?.privateTracks).toEqual([
+      { trackId: mine, title: "My private", creatorName: "Owner", canMakeUnlisted: true },
+      { trackId: theirs, title: "Their private", creatorName: "Musician", canMakeUnlisted: false },
+    ]);
+  });
+
+  test("nobody but the playlist owner receives the list, even a viewer who can see the private tracks", async () => {
+    const { t, musician, stranger, shareableId } = await playlistWithPrivateTracks();
+
+    for (const client of [musician.as, stranger.as, t]) {
+      const playlist = await client.query(api.playlists.getByShareableId, { shareableId });
+      expect(playlist).not.toBeNull();
+      expect(playlist).not.toHaveProperty("privateTracks");
+    }
+    // The musician does see their own private track in the list itself.
+    expect(await titlesSeenBy(musician.as, shareableId)).toEqual(["Open", "Their private", "Linked"]);
+  });
+
+  test("making a track unlisted clears it from the list; none left means an empty list", async () => {
+    const { owner, musician, shareableId, mine, theirs } = await playlistWithPrivateTracks();
+
+    await owner.as.mutation(api.tracks.updateSettings, { trackId: mine, visibility: "unlisted" });
+    const afterOne = await owner.as.query(api.playlists.getByShareableId, { shareableId });
+    expect(afterOne?.privateTracks?.map((track) => track.title)).toEqual(["Their private"]);
+
+    await musician.as.mutation(api.tracks.updateSettings, { trackId: theirs, visibility: "public" });
+    const afterBoth = await owner.as.query(api.playlists.getByShareableId, { shareableId });
+    expect(afterBoth?.privateTracks).toEqual([]);
+  });
+
+  test("a private track the owner lost access to is not named", async () => {
+    const { owner, musician, shareableId, theirs } = await playlistWithPrivateTracks();
+    await musician.as.mutation(api.tracks.revokeAccess, { trackId: theirs, userId: owner.userId });
+
+    const playlist = await owner.as.query(api.playlists.getByShareableId, { shareableId });
+
+    expect(playlist?.privateTracks?.map((track) => track.title)).toEqual(["My private"]);
+    expect(playlist?.hiddenCount).toBe(1);
+    expect(JSON.stringify(playlist)).not.toContain("Their private");
   });
 });
