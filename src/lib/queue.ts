@@ -45,3 +45,15 @@ export function nextIndex(index: number, length: number): number | null {
 export function previousTarget(index: number, currentTime: number): 'restart' | number {
   return currentTime > RESTART_THRESHOLD_SECONDS || index === 0 ? 'restart' : index - 1;
 }
+
+/**
+ * Whether a queue is what pressing play in this list would have produced:
+ * the list's playable tracks from some track to the end. A shared track is
+ * not enough; the same track can be queued from another list.
+ */
+export function isQueueFrom(queue: QueueItem[], tracks: QueueSource[]): boolean {
+  if (queue.length === 0) return false;
+  const playable = tracks.filter((t) => t.latestVersionId).map((t) => t._id);
+  const tail = playable.slice(playable.length - queue.length);
+  return tail.length === queue.length && queue.every((item, i) => item.trackId === tail[i]);
+}

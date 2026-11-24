@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { buildQueue, nextIndex, previousTarget } from './queue';
+import { buildQueue, isQueueFrom, nextIndex, previousTarget } from './queue';
 import type { TrackId, VersionId } from '@/types';
 
 const track = (id: string, hasVersion = true) => ({
@@ -47,5 +47,24 @@ describe('queue', () => {
     expect(previousTarget(2, 3)).toBe(1);
     expect(previousTarget(2, 0)).toBe(1);
     expect(previousTarget(0, 0)).toBe('restart');
+  });
+
+  test('a queue belongs to a list when it is the rest of that list from some track', () => {
+    const playlist = [track('a'), track('b', false), track('c'), track('d')];
+    expect(isQueueFrom(buildQueue(playlist, 'a' as TrackId)!, playlist)).toBe(true);
+    expect(isQueueFrom(buildQueue(playlist, 'c' as TrackId)!, playlist)).toBe(true);
+  });
+
+  test('a queue from another list does not belong, even if it shares a track', () => {
+    const playlist = [track('a'), track('c')];
+    const home = [track('a'), track('x')];
+    expect(isQueueFrom(buildQueue(home, 'a' as TrackId)!, playlist)).toBe(false);
+    expect(isQueueFrom([], playlist)).toBe(false);
+  });
+
+  test('a queue stops belonging once the list gains a track after it', () => {
+    const before = [track('a'), track('b')];
+    const queue = buildQueue(before, 'a' as TrackId)!;
+    expect(isQueueFrom(queue, [...before, track('c')])).toBe(false);
   });
 });

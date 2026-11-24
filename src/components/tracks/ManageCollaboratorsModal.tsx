@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type RefObject } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { toast } from 'sonner';
 import { api } from '../../../convex/_generated/api';
@@ -12,9 +12,11 @@ interface ManageCollaboratorsModalProps {
   isOpen: boolean;
   onClose: () => void;
   trackId: TrackId;
+  /** See Modal's returnFocusTo. */
+  returnFocusTo?: RefObject<HTMLElement | null>;
 }
 
-export function ManageCollaboratorsModal({ isOpen, onClose, trackId }: ManageCollaboratorsModalProps) {
+export function ManageCollaboratorsModal({ isOpen, onClose, trackId, returnFocusTo }: ManageCollaboratorsModalProps) {
   const [searchEmail, setSearchEmail] = useState('');
   const [searchSubmitted, setSearchSubmitted] = useState('');
   const [granting, setGranting] = useState(false);
@@ -61,7 +63,7 @@ export function ManageCollaboratorsModal({ isOpen, onClose, trackId }: ManageCol
   const alreadyHasAccess = foundUser && collaborators?.some((c) => c.userId === foundUser._id);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Manage Collaborators" size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title="Manage Collaborators" size="md" returnFocusTo={returnFocusTo}>
       <div className="space-y-6">
         {/* Search & Invite */}
         <form onSubmit={handleSearch} className="space-y-3">

@@ -134,7 +134,7 @@
 | OG meta tags | `index.html` | Static OG/Twitter Card tags, description, theme-color, placeholder image |
 | Utility functions | `src/lib/utils.ts` | cn, formatDuration, formatFileSize, generateShareableLink, formatRelativeTime, getRecordingMimeType, mimeToExtension |
 | File-type registry | `src/lib/fileTypes.ts` | validateUpload(file, 'track' \| 'attachment'), maxUploadBytes, acceptAttribute, attachmentKind, isLossless, extensionOf |
-| Queue logic | `src/lib/queue.ts` | buildQueue(tracks, startTrackId), nextIndex, previousTarget (restart after 3s) |
+| Queue logic | `src/lib/queue.ts` | buildQueue(tracks, startTrackId), isQueueFrom(queue, tracks), nextIndex, previousTarget (restart after 3s) |
 | Audio focus | `src/lib/audioFocus.ts` | claimAudioFocus/releaseAudioFocus: starting one player pauses the other (queue player vs. `useWaveform`) |
 | R2 upload | `src/lib/r2Upload.ts` | putToSignedUrl: XHR PUT with progress |
 | Anonymous user utils | `src/lib/anonymousUser.ts` | generateAnonymousName, generateAnonymousId, getAnonymousIdentity (localStorage persistence) |
@@ -163,11 +163,11 @@
 | Home | `/` | Done: compact hero section + public tracks grid (title/creator search via URL `?q=` param) + empty-state CTA; play from card queues the grid |
 | Login | `/login` | Done: email/password, sign in/sign up toggle, password visibility toggle, autocomplete attributes |
 | Track Detail | `/track/:shareableId` | Done: pinned version session state, waveform player with double-click / button timestamp commenting, comments (with accessible cross-version switch), settings menu |
-| Playlist | `/playlist/:shareableId` | Done: opens for anyone with the link; title, description, creator, track count + total duration, Play button (queues the list from the first track with audio via `usePlayer().playFrom`; Pause/Resume while one of its tracks is current), ordered track list (per-row play from that track, now-playing mark, duration, link to track page), "N tracks unavailable" note, share button (copies the playlist link), empty and not-found states. Renders owner copy from `viewerRole` |
+| Playlist | `/playlist/:shareableId` | Done: opens for anyone with the link; title, description, creator, track count + total duration, Play button (queues the list from the first track with audio via `usePlayer().playFrom`; Pause/Resume while the queue is this playlist's, per `isQueueFrom`), ordered track list (per-row play from that track, now-playing mark, duration, link to track page), "N tracks unavailable" note, share button (copies the playlist link), empty and not-found states. Renders owner copy from `viewerRole` |
 | Upload | `/upload` | Done: card-framed drop zone + form, accessible visibility radio group, progress bar, redirect |
 | Profile | `/profile` | Done: initial avatar card with inline name + email editing, responsive track header + full-width mobile filters, Playlists section (create, open), shared tracks section, account settings with password change, sign out, and two-mode account deletion |
 
-### Components (30 total)
+### Components (31 total)
 
 | Component | Location | Status |
 |-----------|----------|--------|
@@ -188,6 +188,7 @@
 | VersionSelector | `src/components/tracks/VersionSelector.tsx` | Done: custom accessible select chevron with version names + dates |
 | ShareButton | `src/components/tracks/ShareButton.tsx` | Done: copies a track or playlist link (`kind` prop) to clipboard with toast confirmation |
 | CreatePlaylistModal | `src/components/playlists/CreatePlaylistModal.tsx` | Done: title + optional description form; reports the new playlist via `onCreated` |
+| AddToPlaylistButton | `src/components/playlists/AddToPlaylistButton.tsx` | Done: icon button owning its picker state; keyed by track on the track page |
 | AddToPlaylistModal | `src/components/playlists/AddToPlaylistModal.tsx` | Done: lists the user's playlists with track counts + "New playlist"; adds the given track. Opened from `TrackCard`, `TrackSettingsDropdown` (owner) and the track page header (other signed-in viewers) |
 | TrackSettingsDropdown | `src/components/tracks/TrackSettingsDropdown.tsx` | Done: WAI-ARIA keyboard menu (visibility, downloads, collaborators, add to playlist, delete) with outside-click and Tab dismissal |
 | AddVersionModal | `src/components/tracks/AddVersionModal.tsx` | Done: file upload + version metadata |

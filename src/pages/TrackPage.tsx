@@ -9,7 +9,7 @@ import { VersionSelector } from '@/components/tracks/VersionSelector';
 import { ShareButton } from '@/components/tracks/ShareButton';
 import { TrackSettingsDropdown } from '@/components/tracks/TrackSettingsDropdown';
 import { AddVersionModal } from '@/components/tracks/AddVersionModal';
-import { AddToPlaylistModal } from '@/components/playlists/AddToPlaylistModal';
+import { AddToPlaylistButton } from '@/components/playlists/AddToPlaylistButton';
 import { DownloadButton } from '@/components/tracks/DownloadButton';
 import { TrackDescription } from '@/components/tracks/TrackDescription';
 import { CommentForm } from '@/components/comments/CommentForm';
@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/Button';
 import { PlayerErrorFallback } from '@/components/ui/PlayerErrorFallback';
 import { useAnonymousIdentity } from '@/hooks/useAnonymousIdentity';
 import { cn, formatDuration } from '@/lib/utils';
-import { Loader2, Globe, Lock, Link2, ListPlus, Plus, X, Clock, MessageCircle, Layers } from 'lucide-react';
+import { Loader2, Globe, Lock, Link2, Plus, X, Clock, MessageCircle, Layers } from 'lucide-react';
 import type { VersionId } from '@/types';
 
 const VISIBILITY_LABEL = {
@@ -83,8 +83,6 @@ export function TrackPage() {
   );
 
   const isOwner = track?.viewerRole === 'owner';
-  // Keyed by track so the picker cannot follow a route change to another track.
-  const [playlistPickerFor, setPlaylistPickerFor] = useState<string | null>(null);
 
   // Build timestamp markers for the player
   const playerTimestampComments = threads?.timestamped.map((c) => ({
@@ -152,23 +150,8 @@ export function TrackPage() {
             <div className="flex items-center gap-2 flex-shrink-0">
               <ShareButton shareableId={track.shareableId} />
               {/* Owners get this inside the settings menu. */}
-              {viewer && !isOwner && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setPlaylistPickerFor(track._id)}
-                  aria-label="Add to playlist"
-                  title="Add to playlist"
-                >
-                  <ListPlus className="w-4 h-4" />
-                </Button>
-              )}
+              {viewer && !isOwner && <AddToPlaylistButton key={track._id} track={track} />}
               {isOwner && <TrackSettingsDropdown track={track} />}
-              <AddToPlaylistModal
-                isOpen={playlistPickerFor === track._id}
-                onClose={() => setPlaylistPickerFor(null)}
-                track={track}
-              />
             </div>
           </div>
           {track.description && (

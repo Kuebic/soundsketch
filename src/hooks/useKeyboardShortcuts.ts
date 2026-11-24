@@ -22,8 +22,6 @@ const INTERACTIVE_SELECTOR = [
   '[role="listbox"]',
   '[role="option"]',
   '[role="tab"]',
-  // A modal owns the keyboard while it is open.
-  '[role="dialog"]',
 ].join(',');
 
 export function useKeyboardShortcuts({
@@ -34,6 +32,8 @@ export function useKeyboardShortcuts({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      // A modal owns the keyboard while it is open, wherever focus sits.
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
       const target = e.target as HTMLElement | null;
       if (target && (target.isContentEditable || target.closest(INTERACTIVE_SELECTOR))) {
         return;

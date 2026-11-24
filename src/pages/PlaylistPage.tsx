@@ -7,6 +7,7 @@ import { ShareButton } from '@/components/tracks/ShareButton';
 import { TrackDescription } from '@/components/tracks/TrackDescription';
 import { Button } from '@/components/ui/Button';
 import { usePlayer } from '@/hooks/usePlayer';
+import { isQueueFrom } from '@/lib/queue';
 import { cn, formatDuration } from '@/lib/utils';
 
 export function PlaylistPage() {
@@ -52,11 +53,20 @@ export function PlaylistPage() {
   // The queue is built from this list; it skips tracks with no audio, so
   // Play only has to find the first one that has some.
   const firstPlayable = tracks.find((track) => track.latestVersionId);
-  const currentInList = tracks.some((track) => track._id === player.current?.trackId);
-  const playingHere = currentInList && player.isPlaying;
+  // Sharing a track is not enough to call the queue ours: the same track
+  // may be playing from Home, or this list may have changed since.
+  const queuedHere = isQueueFrom(player.queue, tracks);
+  const lastQueued = player.queue[player.queue.length - 1];
+  const finished =
+    !player.isPlaying &&
+    player.current?.trackId === lastQueued?.trackId &&
+    player.duration > 0 &&
+    player.currentTime >= player.duration - 0.25;
+  const canToggle = queuedHere && !finished;
+  const playingHere = queuedHere && player.isPlaying;
 
   const handlePlayAll = () => {
-    if (currentInList) player.toggle();
+    if (canToggle) player.toggle();
     else if (firstPlayable) player.playFrom(tracks, firstPlayable._id);
   };
 
@@ -96,7 +106,7 @@ export function PlaylistPage() {
           {firstPlayable && (
             <Button size="lg" onClick={handlePlayAll} className="mt-4 w-full sm:w-auto">
               {playingHere ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-              {playingHere ? 'Pause' : currentInList ? 'Resume' : 'Play'}
+              {playingHere ? 'Pause' : canToggle ? 'Resume' : 'Play'}
             </Button>
           )}
         </div>
@@ -129,7 +139,9 @@ export function PlaylistPage() {
                 >
                   <button
                     type="button"
-                    onClick={() => (isCurrent ? player.toggle() : player.playFrom(tracks, track._id))}
+                    onClick={() =>
+                      isCurrent && canToggle ? player.toggle() : player.playFrom(tracks, track._id)
+                    }
                     disabled={!canPlay}
                     aria-label={isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
                     title={canPlay ? undefined : 'No audio yet'}

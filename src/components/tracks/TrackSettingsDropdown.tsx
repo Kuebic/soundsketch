@@ -207,6 +207,7 @@ export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
         isOpen={showCollaborators}
         onClose={() => setShowCollaborators(false)}
         trackId={track._id}
+        returnFocusTo={triggerRef}
       />
 
       <AddToPlaylistModal
@@ -217,7 +218,7 @@ export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
       />
 
       {/* Delete confirmation */}
-      <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Delete Track" size="sm">
+      <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Delete Track" size="sm" returnFocusTo={triggerRef}>
         <p className="text-sm text-studio-text-secondary mb-6">
           Are you sure you want to delete <strong>{track.title}</strong>? This action cannot be undone.
         </p>
