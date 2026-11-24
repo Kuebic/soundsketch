@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { useQuery } from 'convex/react';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -16,15 +16,23 @@ import { CommentList } from '@/components/comments/CommentList';
 import { Button } from '@/components/ui/Button';
 import { PlayerErrorFallback } from '@/components/ui/PlayerErrorFallback';
 import { useAnonymousIdentity } from '@/hooks/useAnonymousIdentity';
-import { formatDuration } from '@/lib/utils';
+import { cn, formatDuration } from '@/lib/utils';
 import { Loader2, Globe, Lock, Link2, Plus, X, Clock, MessageCircle, Layers } from 'lucide-react';
 import type { VersionId } from '@/types';
+
+const VISIBILITY_LABEL = {
+  public: 'Public',
+  unlisted: 'Unlisted',
+  private: 'Private',
+} as const;
 
 export function TrackPage() {
   const { shareableId } = useParams<{ shareableId: string }>();
   const location = useLocation();
-  const [selectedVersionId, setSelectedVersionId] = useState<VersionId | null>(null);
-  const [timestampForComment, setTimestampForComment] = useState<number | null>(null);
+  // Pin the active version per track so incoming collaborator uploads do not
+  // silently swap the recording or redirect an in-progress comment draft.
+  const [pickedVersion, setPickedVersion] = useState<{ shareableId: string; versionId: VersionId } | null>(null);
+  const [timestampDraft, setTimestampDraft] = useState<{ timestamp: number; versionId: VersionId } | null>(null);
   const [seekToTime, setSeekToTime] = useState<number | null>(null);
   const [showAddVersion, setShowAddVersion] = useState(false);
   const [showAllVersions, setShowAllVersions] = useState(false);
@@ -39,6 +47,33 @@ export function TrackPage() {
     api.versions.getByTrack,
     track ? { trackId: track._id } : 'skip'
   );
+
+  // Pin the first version once loaded for this shareableId so subsequent
+  // reactive inserts at versions[0] do not hijack the listening session.
+  useEffect(() => {
+    if (!shareableId || !versions || versions.length === 0) return;
+    setPickedVersion((prev) => {
+      if (prev && prev.shareableId === shareableId && versions.some((v) => v._id === prev.versionId)) {
+        return prev;
+      }
+      return { shareableId, versionId: versions[0]._id };
+    });
+  }, [shareableId, versions]);
+
+  const pickedVersionId =
+    pickedVersion && pickedVersion.shareableId === shareableId ? pickedVersion.versionId : null;
+  const selectedVersion =
+    versions?.find((v) => v._id === pickedVersionId) ?? versions?.[0];
+  const selectedVersionId = selectedVersion?._id ?? null;
+  const selectVersion = (versionId: VersionId) => {
+    if (shareableId) setPickedVersion({ shareableId, versionId });
+    setTimestampDraft(null);
+  };
+
+  // Keep an active timestamp draft bound only to the currently selected version.
+  const activeTimestampDraft =
+    timestampDraft && timestampDraft.versionId === selectedVersionId ? timestampDraft : null;
+
   const threads = useQuery(
     api.comments.listThreads,
     selectedVersionId
@@ -46,20 +81,7 @@ export function TrackPage() {
       : 'skip'
   );
 
-  // Set initial selected version when versions load
-  useEffect(() => {
-    if (versions && versions.length > 0 && !selectedVersionId) {
-      setSelectedVersionId(versions[0]._id);
-    }
-  }, [versions, selectedVersionId]);
-
-  // Reset selected version when switching tracks
-  useEffect(() => {
-    setSelectedVersionId(null);
-  }, [shareableId]);
-
   const isOwner = track?.viewerRole === 'owner';
-  const selectedVersion = versions?.find((v) => v._id === selectedVersionId);
 
   // Build timestamp markers for the player
   const playerTimestampComments = threads?.timestamped.map((c) => ({
@@ -103,21 +125,28 @@ export function TrackPage() {
     <div className="min-h-screen">
       <Navbar />
 
-      <main className="container mx-auto px-3 py-6 sm:px-4 sm:py-8 max-w-4xl">
+      <main className="container mx-auto px-3 py-4 sm:px-4 sm:py-8 max-w-4xl">
         {/* Track Header */}
-        <div className="mb-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="mb-4 sm:mb-6">
+          <div className="flex items-start justify-between gap-3 sm:gap-4">
             <div className="flex-1 min-w-0">
-              <h1 className="text-2xl sm:text-3xl font-bold mb-1 truncate">{track.title}</h1>
-              <p className="text-studio-text-secondary">{track.creatorName}</p>
+              <h1 className="text-2xl sm:text-3xl font-bold leading-tight line-clamp-2 break-words">
+                {track.title}
+              </h1>
+              <div className="mt-1 flex items-center gap-2 min-w-0 text-sm text-studio-text-secondary">
+                <span className="truncate">{track.creatorName}</span>
+                <span
+                  className="inline-flex flex-shrink-0 items-center gap-1 rounded-full border border-studio-gray bg-studio-dark px-2 py-0.5 text-xs"
+                  title={`Visibility: ${VISIBILITY_LABEL[track.visibility]}`}
+                >
+                  {track.visibility === 'public' && <Globe className="w-3 h-3" />}
+                  {track.visibility === 'unlisted' && <Link2 className="w-3 h-3" />}
+                  {track.visibility === 'private' && <Lock className="w-3 h-3" />}
+                  {VISIBILITY_LABEL[track.visibility]}
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0 self-start">
-              <span className="flex items-center gap-1 text-xs text-studio-text-secondary">
-                {track.visibility === "public" && <Globe className="w-3.5 h-3.5" />}
-                {track.visibility === "unlisted" && <Link2 className="w-3.5 h-3.5" />}
-                {track.visibility === "private" && <Lock className="w-3.5 h-3.5" />}
-                {track.visibility === "public" ? "Public" : track.visibility === "unlisted" ? "Unlisted" : "Private"}
-              </span>
+            <div className="flex items-center gap-2 flex-shrink-0">
               <ShareButton shareableId={track.shareableId} />
               {isOwner && <TrackSettingsDropdown track={track} />}
             </div>
@@ -127,35 +156,60 @@ export function TrackPage() {
           )}
         </div>
 
-        {/* Version Selector */}
-        {versions && versions.length > 0 && selectedVersionId && (
+        {/* Version toolbar */}
+        {versions && versions.length > 0 && selectedVersion && (
           <div className="mb-4 space-y-2">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center justify-between gap-2">
               <VersionSelector
                 versions={versions}
-                currentVersionId={selectedVersionId}
-                onVersionChange={setSelectedVersionId}
+                currentVersionId={selectedVersion._id}
+                onVersionChange={selectVersion}
               />
-              <div className="flex items-center gap-2 self-start">
-                {(track.downloadsEnabled || isOwner) && selectedVersionId && (
-                  <DownloadButton versionId={selectedVersionId} />
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {(track.downloadsEnabled || isOwner) && (
+                  <DownloadButton versionId={selectedVersion._id} />
                 )}
                 {isOwner && (
-                  <Button variant="secondary" size="sm" onClick={() => setShowAddVersion(true)}>
-                    <Plus className="w-4 h-4 mr-1" />
-                    New Version
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowAddVersion(true)}
+                    aria-label="New version"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline">New Version</span>
                   </Button>
                 )}
               </div>
             </div>
+            {selectedVersion.changeNotes && (
+              <p className="text-xs text-studio-text-secondary italic line-clamp-2 break-words">
+                {selectedVersion.changeNotes}
+              </p>
+            )}
             {versions.length > 1 && (
-              <label className="flex items-center gap-2 text-sm text-studio-text-secondary cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showAllVersions}
-                  onChange={(e) => setShowAllVersions(e.target.checked)}
-                  className="accent-studio-accent"
-                />
+              <label className="inline-flex items-center gap-2 text-sm text-studio-text-secondary cursor-pointer select-none">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={showAllVersions}
+                  onClick={() => setShowAllVersions((v) => !v)}
+                  className={cn(
+                    'relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-studio-accent focus-visible:ring-offset-2 focus-visible:ring-offset-studio-black',
+                    showAllVersions
+                      ? 'bg-studio-accent border-studio-accent'
+                      : 'bg-studio-dark border-studio-gray'
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'inline-block h-3.5 w-3.5 rounded-full transition-transform',
+                      showAllVersions
+                        ? 'translate-x-[18px] bg-white'
+                        : 'translate-x-0.5 bg-studio-text-secondary'
+                    )}
+                  />
+                </button>
                 <Layers className="w-4 h-4" />
                 Show comments from all versions
               </label>
@@ -165,14 +219,14 @@ export function TrackPage() {
 
         {/* Player */}
         {selectedVersion ? (
-          <div className="mb-8">
+          <div className="mb-6 sm:mb-8">
             <ErrorBoundary
               FallbackComponent={PlayerErrorFallback}
               resetKeys={[selectedVersion._id]}
             >
               <TrackPlayer
                 versionId={selectedVersion._id}
-                onTimestampClick={(ts) => setTimestampForComment(ts)}
+                onRequestComment={(ts) => setTimestampDraft({ timestamp: ts, versionId: selectedVersion._id })}
                 timestampComments={playerTimestampComments}
                 seekToTime={seekToTime}
                 onSeekComplete={() => setSeekToTime(null)}
@@ -190,31 +244,36 @@ export function TrackPage() {
             </p>
             {isOwner && (
               <Button variant="primary" size="sm" className="mt-4" onClick={() => setShowAddVersion(true)}>
-                <Plus className="w-4 h-4 mr-1" />
+                <Plus className="w-4 h-4" />
                 Upload First Version
               </Button>
             )}
           </div>
         )}
 
-        {/* Timestamp Comment Form (when waveform is clicked) */}
-        {timestampForComment !== null && selectedVersionId && (
+        {/* Timestamp Comment Form */}
+        {activeTimestampDraft && (
           <div className="card mb-6 border border-studio-accent/30">
             <div className="flex items-center justify-between mb-3">
               <span className="flex items-center gap-1.5 text-sm text-studio-accent-cyan mono">
                 <Clock className="w-4 h-4" />
-                Comment at {formatDuration(timestampForComment)}
+                Comment at {formatDuration(activeTimestampDraft.timestamp)}
               </span>
-              <button onClick={() => setTimestampForComment(null)} className="text-studio-text-secondary hover:text-studio-text-primary">
+              <button
+                type="button"
+                onClick={() => setTimestampDraft(null)}
+                className="p-1 rounded text-studio-text-secondary hover:text-studio-text-primary hover:bg-studio-dark"
+                aria-label="Close timestamp comment"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
             <CommentForm
-              versionId={selectedVersionId}
+              versionId={activeTimestampDraft.versionId}
               trackId={track._id}
-              timestamp={timestampForComment}
-              onSubmit={() => setTimestampForComment(null)}
-              onCancel={() => setTimestampForComment(null)}
+              timestamp={activeTimestampDraft.timestamp}
+              onSubmit={() => setTimestampDraft(null)}
+              onCancel={() => setTimestampDraft(null)}
               placeholder="Add feedback at this timestamp..."
             />
           </div>
@@ -245,7 +304,7 @@ export function TrackPage() {
                 onTimestampClick={(ts) => setSeekToTime(ts)}
                 versionId={selectedVersionId}
                 trackId={track._id}
-                emptyMessage="Click on the waveform to add timestamp-specific feedback."
+                emptyMessage="Double-click the waveform or press Comment in the player to add timestamp feedback."
               />
             </section>
 

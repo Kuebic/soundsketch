@@ -7,7 +7,7 @@ import { useFileUpload } from '@/hooks/useFileUpload';
 import { Navbar } from '@/components/layout/Navbar';
 import { FileDropZone } from '@/components/upload/FileDropZone';
 import { Button } from '@/components/ui/Button';
-import { Loader2, Globe, Link2, Lock, Download } from 'lucide-react';
+import { Loader2, Globe, Link2, Lock } from 'lucide-react';
 
 export function Upload() {
   const viewer = useQuery(api.users.viewer);
@@ -69,14 +69,29 @@ export function Upload() {
     }
   };
 
+  const canSubmit = !!file && !!title.trim() && !uploading;
+  const missingHint = !file && !title.trim()
+    ? 'Select an audio file and enter a title to upload.'
+    : !file
+      ? 'Select an audio file to upload.'
+      : 'Enter a title to upload.';
+
   return (
     <div className="min-h-screen">
       <Navbar />
 
-      <main className="container mx-auto px-4 py-12 max-w-2xl">
-        <h1 className="text-3xl font-bold mb-8">Upload Track</h1>
+      <main className="container mx-auto px-4 py-8 sm:py-12 max-w-2xl">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold">Upload Track</h1>
+          <p className="text-sm text-studio-text-secondary mt-1">
+            Share a new demo. You can add more versions later.
+          </p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form
+          onSubmit={handleSubmit}
+          className="card hover:border-studio-gray hover:shadow-none space-y-6"
+        >
           {/* File Drop Zone */}
           <FileDropZone
             file={file}
@@ -84,99 +99,133 @@ export function Upload() {
             onFileClear={() => setFile(null)}
           />
 
-          {/* Title */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Title *</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Track title"
-              className="input w-full"
-              required
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Description</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="What's this track about?"
-              rows={4}
-              className="input w-full resize-y min-h-[6rem]"
-            />
-          </div>
-
-          {/* Visibility */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Visibility</label>
-            <div className="flex gap-3">
-              {([
-                { value: "public", label: "Public", Icon: Globe },
-                { value: "unlisted", label: "Unlisted", Icon: Link2 },
-                { value: "private", label: "Private", Icon: Lock },
-              ] as const).map(({ value, label, Icon }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setVisibility(value)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    visibility === value
-                      ? 'bg-studio-accent text-white'
-                      : 'bg-studio-dark text-studio-text-secondary border border-studio-gray'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {label}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-studio-text-secondary mt-1.5">
-              {visibility === "public" && "Anyone can discover this track on the home page."}
-              {visibility === "unlisted" && "Only people with the link can view this track."}
-              {visibility === "private" && "Only you and invited collaborators can access this track."}
-            </p>
-          </div>
-
-          {/* Version Name */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Version Name</label>
-            <input
-              type="text"
-              value={versionName}
-              onChange={(e) => setVersionName(e.target.value)}
-              placeholder="v1"
-              className="input w-full"
-            />
-          </div>
-
-          {/* Downloads */}
-          <div className="flex items-start gap-3">
-            <button
-              type="button"
-              onClick={() => setDownloadsEnabled(!downloadsEnabled)}
-              className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                downloadsEnabled
-                  ? 'bg-studio-accent border-studio-accent'
-                  : 'border-studio-gray hover:border-studio-text-secondary'
-              }`}
-            >
-              {downloadsEnabled && (
-                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-            </button>
-            <div className="flex-1">
-              <label className="text-sm font-medium flex items-center gap-1.5 cursor-pointer" onClick={() => setDownloadsEnabled(!downloadsEnabled)}>
-                <Download className="w-4 h-4" />
-                Allow downloads
+          <div className="space-y-5">
+            {/* Title */}
+            <div>
+              <label htmlFor="upload-title" className="block text-sm font-medium mb-1.5">
+                Title <span className="text-studio-accent">*</span>
               </label>
-              <p className="text-xs text-studio-text-secondary mt-0.5">
-                Viewers can download the original audio file (WAV/FLAC files are converted to MP3 for streaming but originals are preserved for download)
+              <input
+                id="upload-title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Track title"
+                className="input w-full"
+                required
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label htmlFor="upload-description" className="block text-sm font-medium mb-1.5">Description</label>
+              <textarea
+                id="upload-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="What's this track about?"
+                rows={4}
+                className="input w-full resize-y min-h-[6rem]"
+              />
+            </div>
+
+            {/* Version Name */}
+            <div>
+              <label htmlFor="upload-version" className="block text-sm font-medium mb-1.5">Version Name</label>
+              <input
+                id="upload-version"
+                type="text"
+                value={versionName}
+                onChange={(e) => setVersionName(e.target.value)}
+                placeholder="v1"
+                className="input w-full"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-5 border-t border-studio-gray pt-6">
+            {/* Visibility */}
+            <div>
+              <span id="upload-visibility" className="block text-sm font-medium mb-2">Visibility</span>
+              <div
+                role="radiogroup"
+                aria-labelledby="upload-visibility"
+                className="grid grid-cols-3 gap-1 rounded-xl border border-studio-gray bg-studio-dark/60 p-1"
+              >
+                {([
+                  { value: "public", label: "Public", Icon: Globe },
+                  { value: "unlisted", label: "Unlisted", Icon: Link2 },
+                  { value: "private", label: "Private", Icon: Lock },
+                ] as const).map(({ value, label, Icon }, idx, options) => {
+                  const selected = visibility === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      tabIndex={selected ? 0 : -1}
+                      onClick={() => setVisibility(value)}
+                      onKeyDown={(e) => {
+                        let nextIdx: number | null = null;
+                        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                          nextIdx = (idx + 1) % options.length;
+                        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                          nextIdx = (idx - 1 + options.length) % options.length;
+                        }
+                        if (nextIdx === null) return;
+                        e.preventDefault();
+                        setVisibility(options[nextIdx].value);
+                        const radios = e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="radio"]');
+                        radios?.[nextIdx]?.focus();
+                      }}
+                      className={`flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 sm:px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-studio-accent ${
+                        selected
+                          ? 'bg-studio-accent text-white shadow-sm'
+                          : 'text-studio-text-secondary hover:bg-studio-gray/60 hover:text-studio-text-primary'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-studio-text-secondary mt-2">
+                {visibility === "public" && "Anyone can discover this track on the home page."}
+                {visibility === "unlisted" && "Only people with the link can view this track."}
+                {visibility === "private" && "Only you and invited collaborators can access this track."}
               </p>
+            </div>
+
+            {/* Downloads */}
+            <div className="flex items-center justify-between gap-4 bg-studio-dark/60 border border-studio-gray rounded-xl p-3.5">
+              <div className="min-w-0">
+                <p id="upload-downloads-label" className="text-sm font-medium">Allow downloads</p>
+                <p id="upload-downloads-desc" className="text-xs text-studio-text-secondary mt-0.5">
+                  Viewers can download the original file. WAV and FLAC stream as MP3, but originals are kept for download.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={downloadsEnabled}
+                aria-labelledby="upload-downloads-label"
+                aria-describedby="upload-downloads-desc"
+                onClick={() => setDownloadsEnabled(!downloadsEnabled)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-studio-accent focus-visible:ring-offset-2 focus-visible:ring-offset-studio-darker ${
+                  downloadsEnabled
+                    ? 'bg-studio-accent border-studio-accent'
+                    : 'bg-studio-black border-studio-gray hover:border-studio-text-secondary'
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                    downloadsEnabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
             </div>
           </div>
 
@@ -197,26 +246,34 @@ export function Upload() {
 
           {/* Errors */}
           {uploadError && (
-            <p className="text-sm text-red-400">{uploadError}</p>
+            <p role="alert" className="text-sm text-red-400">{uploadError}</p>
           )}
 
           {/* Submit */}
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            disabled={!file || !title.trim() || uploading}
-            className="w-full"
-          >
-            {uploading ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                Uploading...
-              </>
-            ) : (
-              'Upload Track'
+          <div>
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              disabled={!canSubmit}
+              aria-describedby={!canSubmit && !uploading ? 'upload-submit-hint' : undefined}
+              className="w-full"
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                'Upload Track'
+              )}
+            </Button>
+            {!canSubmit && !uploading && (
+              <p id="upload-submit-hint" className="text-xs text-studio-text-secondary text-center mt-2">
+                {missingHint}
+              </p>
             )}
-          </Button>
+          </div>
         </form>
       </main>
     </div>

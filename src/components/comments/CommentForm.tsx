@@ -31,6 +31,12 @@ const attachmentTypeIcons = {
   unknown: File,
 };
 
+const textareaClass =
+  'block w-full resize-none bg-transparent px-3 pt-3 pb-2 text-sm text-studio-text-primary placeholder:text-studio-text-secondary border-0 rounded-t-xl focus:outline-none focus:ring-0 disabled:opacity-60';
+
+const toolButtonClass =
+  'inline-flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs text-studio-text-secondary hover:text-studio-text-primary hover:bg-studio-gray/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-studio-accent';
+
 export function CommentForm({
   versionId,
   trackId,
@@ -134,7 +140,8 @@ export function CommentForm({
         </div>
       )}
 
-      <div className="flex gap-2">
+      {/* Composer: borderless textarea over an integrated toolbar */}
+      <div className="bg-studio-dark border border-studio-gray rounded-xl focus-within:ring-2 focus-within:ring-studio-accent focus-within:border-transparent transition-shadow">
         {participants && participants.length > 0 ? (
           <MentionInput
             value={text}
@@ -143,7 +150,7 @@ export function CommentForm({
             placeholder={placeholder}
             rows={3}
             disabled={submitting || uploading}
-            className="input resize-none text-sm"
+            className={textareaClass}
           />
         ) : (
           <textarea
@@ -151,47 +158,56 @@ export function CommentForm({
             onChange={(e) => setText(e.target.value)}
             placeholder={placeholder}
             rows={3}
-            className="input flex-1 resize-none text-sm"
+            className={textareaClass}
             disabled={submitting || uploading}
           />
         )}
-        <div className="flex flex-col gap-1">
-          <Button
-            type="submit"
-            variant="primary"
-            size="sm"
-            disabled={!text.trim() || submitting || uploading}
-          >
-            {submitting || uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          </Button>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={submitting || uploading}
-            className="p-1.5 rounded text-studio-text-secondary hover:text-studio-text-primary hover:bg-studio-dark transition-colors disabled:opacity-50"
-            title="Attach file"
-          >
-            <Paperclip className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowRecordingModal(true)}
-            disabled={submitting || uploading}
-            className="p-1.5 rounded text-studio-text-secondary hover:text-studio-text-primary hover:bg-studio-dark transition-colors disabled:opacity-50"
-            title="Record audio"
-          >
-            <Mic className="w-4 h-4" />
-          </button>
-          {onCancel && (
-            <Button
+
+        <div className="flex items-center justify-between gap-2 border-t border-studio-gray/60 px-2 py-1.5">
+          <div className="flex items-center gap-0.5">
+            <button
               type="button"
-              variant="secondary"
-              size="sm"
-              onClick={onCancel}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={submitting || uploading}
+              className={toolButtonClass}
+              aria-label="Attach file"
+              title="Attach file"
             >
-              <X className="w-4 h-4" />
+              <Paperclip className="w-4 h-4" />
+              <span className="hidden sm:inline">Attach</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowRecordingModal(true)}
+              disabled={submitting || uploading}
+              className={toolButtonClass}
+              aria-label="Record audio"
+              title="Record audio"
+            >
+              <Mic className="w-4 h-4" />
+              <span className="hidden sm:inline">Record</span>
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="px-2.5 py-1.5 rounded-lg text-sm text-studio-text-secondary hover:text-studio-text-primary hover:bg-studio-gray/60 transition-colors"
+              >
+                Cancel
+              </button>
+            )}
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              disabled={!text.trim() || submitting || uploading}
+            >
+              {submitting || uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              <span>Post</span>
             </Button>
-          )}
+          </div>
         </div>
       </div>
 
@@ -227,6 +243,7 @@ export function CommentForm({
               type="button"
               onClick={() => setAttachmentFile(null)}
               className="text-studio-text-secondary hover:text-red-400 flex-shrink-0"
+              aria-label="Remove attachment"
             >
               <X className="w-3.5 h-3.5" />
             </button>

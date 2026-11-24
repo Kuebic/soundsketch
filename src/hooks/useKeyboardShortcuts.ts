@@ -6,6 +6,24 @@ interface UseKeyboardShortcutsOptions {
   onSeekBackward?: () => void;
 }
 
+const INTERACTIVE_SELECTOR = [
+  'input',
+  'textarea',
+  'select',
+  'button',
+  'a[href]',
+  '[contenteditable="true"]',
+  '[role="button"]',
+  '[role="slider"]',
+  '[role="switch"]',
+  '[role="radio"]',
+  '[role="checkbox"]',
+  '[role="menuitem"]',
+  '[role="listbox"]',
+  '[role="option"]',
+  '[role="tab"]',
+].join(',');
+
 export function useKeyboardShortcuts({
   onPlayPause,
   onSeekForward,
@@ -13,9 +31,11 @@ export function useKeyboardShortcuts({
 }: UseKeyboardShortcutsOptions) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement).tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-      if ((e.target as HTMLElement).isContentEditable) return;
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.isContentEditable || target.closest(INTERACTIVE_SELECTOR))) {
+        return;
+      }
 
       switch (e.code) {
         case 'Space':

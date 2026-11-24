@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation } from 'convex/react';
 import { toast } from 'sonner';
 import { api } from '../../../convex/_generated/api';
@@ -29,6 +29,9 @@ const attachmentTypeIcons = {
   unknown: File,
 };
 
+const actionButtonClass =
+  'inline-flex items-center gap-1 py-1 px-1.5 rounded text-xs text-studio-text-secondary hover:text-studio-text-primary hover:bg-studio-dark transition-colors disabled:opacity-50';
+
 export function CommentItem({
   comment,
   replies,
@@ -45,7 +48,14 @@ export function CommentItem({
   const [editMinutes, setEditMinutes] = useState(() => Math.floor((comment.timestamp ?? 0) / 60));
   const [editSeconds, setEditSeconds] = useState(() => Math.floor((comment.timestamp ?? 0) % 60));
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
+
+  const cancelDeleteConfirm = () => {
+    setConfirmingDelete(false);
+    requestAnimationFrame(() => deleteButtonRef.current?.focus());
+  };
 
   const deleteComment = useMutation(api.comments.deleteComment);
   const updateComment = useMutation(api.comments.updateComment);
@@ -57,6 +67,14 @@ export function CommentItem({
   );
   const AttachmentIcon = attachmentTypeIcons[attachmentType];
 
+  // Only offer collapse when there is enough content to be worth hiding
+  const collapsible =
+    collapsed ||
+    hasAttachment ||
+    (replies?.length ?? 0) > 0 ||
+    comment.commentText.length > 160 ||
+    comment.commentText.split('\n').length > 3;
+
   const handleDelete = async () => {
     try {
       setDeleting(true);
@@ -67,6 +85,7 @@ export function CommentItem({
     } catch {
       toast.error('Failed to delete comment');
       setDeleting(false);
+      setConfirmingDelete(false);
     }
   };
 
@@ -111,25 +130,31 @@ export function CommentItem({
   return (
     <div className="border-l-2 border-studio-gray pl-4 py-2">
       {/* Header */}
-      <div className="flex items-center gap-2 mb-1">
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="text-studio-text-secondary hover:text-studio-text-primary"
-          aria-label={collapsed ? 'Expand comment' : 'Collapse comment'}
-        >
-          {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-        </button>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1">
+        {comment.timestamp !== undefined && (
+          <button
+            type="button"
+            onClick={() => onTimestampClick?.(comment.timestamp!)}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-studio-accent-cyan/10 border border-studio-accent-cyan/25 text-xs text-studio-accent-cyan hover:bg-studio-accent-cyan/20 mono transition-colors"
+            aria-label={`Play from ${formatDuration(comment.timestamp)}`}
+          >
+            <Clock className="w-3 h-3" />
+            {formatDuration(comment.timestamp)}
+          </button>
+        )}
         <span className="text-sm font-medium">{comment.authorName}</span>
         <span className="text-xs text-studio-text-secondary">
           {formatRelativeTime(comment._creationTime)}
         </span>
-        {comment.timestamp !== undefined && (
+        {collapsible && (
           <button
-            onClick={() => onTimestampClick?.(comment.timestamp!)}
-            className="flex items-center gap-0.5 text-xs text-studio-accent-cyan hover:text-studio-accent mono"
+            type="button"
+            onClick={() => setCollapsed(!collapsed)}
+            className="ml-auto p-1 rounded text-studio-text-secondary/60 hover:text-studio-text-primary hover:bg-studio-dark transition-colors"
+            aria-label={collapsed ? 'Expand comment' : 'Collapse comment'}
+            aria-expanded={!collapsed}
           >
-            <Clock className="w-3 h-3" />
-            {formatDuration(comment.timestamp)}
+            {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
         )}
       </div>
@@ -183,7 +208,7 @@ export function CommentItem({
           </div>
         </div>
       ) : (
-        <p className="text-sm text-studio-text-secondary mb-2 whitespace-pre-wrap">
+        <p className="text-sm text-studio-text-primary/90 leading-relaxed mb-2 whitespace-pre-wrap break-words">
           {renderCommentText(comment.commentText)}
         </p>
       )}
@@ -286,33 +311,73 @@ export function CommentItem({
 
       {/* Actions */}
       {!editing && (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-1 -ml-1.5">
           <button
-            onClick={() => setShowReplyForm(!showReplyForm)}
-            className="flex items-center gap-1 text-xs text-studio-text-secondary hover:text-studio-text-primary"
+            type="button"
+            onClick={() => {
+              setConfirmingDelete(false);
+              setShowReplyForm(!showReplyForm);
+            }}
+            className={actionButtonClass}
           >
             <Reply className="w-3 h-3" />
             Reply
           </button>
           {comment.canEdit && (
             <button
-              onClick={() => setEditing(true)}
-              className="flex items-center gap-1 text-xs text-studio-text-secondary hover:text-studio-text-primary"
+              type="button"
+              onClick={() => {
+                setConfirmingDelete(false);
+                setEditing(true);
+              }}
+              className={actionButtonClass}
             >
               <Pencil className="w-3 h-3" />
               Edit
             </button>
           )}
-          {comment.canDelete && (
+          {comment.canDelete && (confirmingDelete ? (
+            <span
+              className="inline-flex items-center gap-1"
+              role="group"
+              aria-label="Confirm delete"
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  cancelDeleteConfirm();
+                }
+              }}
+            >
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="inline-flex items-center gap-1 py-1 px-1.5 rounded text-xs font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+              >
+                {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                Confirm delete?
+              </button>
+              <button
+                type="button"
+                onClick={cancelDeleteConfirm}
+                disabled={deleting}
+                className={actionButtonClass}
+              >
+                Cancel
+              </button>
+            </span>
+          ) : (
             <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="flex items-center gap-1 text-xs text-studio-text-secondary hover:text-red-400"
+              ref={deleteButtonRef}
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              className={`${actionButtonClass} hover:!text-red-400`}
             >
               <Trash2 className="w-3 h-3" />
               Delete
             </button>
-          )}
+          ))}
         </div>
       )}
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation } from 'convex/react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -18,12 +18,57 @@ export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showCollaborators, setShowCollaborators] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const navigate = useNavigate();
   const updateSettings = useMutation(api.tracks.updateSettings);
   const deleteTrack = useMutation(api.tracks.deleteTrack);
 
   const downloadsEnabled = track.downloadsEnabled ?? false;
+
+  useEffect(() => {
+    if (!open) return;
+    const getItems = () =>
+      Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+    getItems()[0]?.focus();
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        setOpen(false);
+        return;
+      }
+      const items = getItems();
+      const idx = items.indexOf(document.activeElement as HTMLElement);
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setOpen(false);
+        triggerRef.current?.focus();
+      } else if (e.key === 'ArrowDown' && items.length > 0) {
+        e.preventDefault();
+        items[(idx + 1) % items.length]?.focus();
+      } else if (e.key === 'ArrowUp' && items.length > 0) {
+        e.preventDefault();
+        items[idx <= 0 ? items.length - 1 : idx - 1]?.focus();
+      } else if (e.key === 'Home' && items.length > 0) {
+        e.preventDefault();
+        items[0]?.focus();
+      } else if (e.key === 'End' && items.length > 0) {
+        e.preventDefault();
+        items[items.length - 1]?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
 
   const handleVisibilityChange = async (newVisibility: "public" | "unlisted" | "private") => {
     try {
@@ -57,73 +102,92 @@ export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
     }
   };
 
+  const itemClass =
+    'w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-studio-dark text-left focus-visible:outline-none focus-visible:bg-studio-dark focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-studio-accent';
+
   return (
-    <div className="relative">
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={() => setOpen(!open)}
+    <div ref={rootRef} className="relative">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-label="Track settings"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium bg-studio-darker border border-studio-gray text-white hover:border-studio-accent/50 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-studio-accent focus-visible:ring-offset-2 focus-visible:ring-offset-studio-black"
       >
         <Settings className="w-4 h-4" />
-      </Button>
+      </button>
 
       {open && (
-        <>
-          {/* Backdrop to close dropdown */}
-          <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
-
-          <div className="absolute right-0 top-full mt-2 w-48 bg-studio-darker border border-studio-gray rounded-lg shadow-lg z-30 overflow-hidden">
-            {([
-              { value: "public" as const, label: "Make Public", Icon: Globe },
-              { value: "unlisted" as const, label: "Make Unlisted", Icon: Link2 },
-              { value: "private" as const, label: "Make Private", Icon: Lock },
-            ])
-              .filter(({ value }) => value !== track.visibility)
-              .map(({ value, label, Icon }) => (
-                <button
-                  key={value}
-                  onClick={() => handleVisibilityChange(value)}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-studio-dark text-left"
-                >
-                  <Icon className="w-4 h-4" />
-                  {label}
-                </button>
-              ))}
-            <button
-              onClick={handleDownloadsToggle}
-              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-studio-dark text-left"
-            >
-              {downloadsEnabled ? (
-                <>
-                  <span className="relative">
-                    <Download className="w-4 h-4" />
-                    <X className="w-2.5 h-2.5 absolute -top-0.5 -right-0.5 text-red-400" />
-                  </span>
-                  Disable Downloads
-                </>
-              ) : (
-                <>
+        <div
+          ref={menuRef}
+          role="menu"
+          aria-label="Track settings"
+          className="absolute right-0 top-full mt-2 w-48 bg-studio-darker border border-studio-gray rounded-lg shadow-xl shadow-black/40 z-50 overflow-hidden"
+        >
+          {([
+            { value: "public" as const, label: "Make Public", Icon: Globe },
+            { value: "unlisted" as const, label: "Make Unlisted", Icon: Link2 },
+            { value: "private" as const, label: "Make Private", Icon: Lock },
+          ])
+            .filter(({ value }) => value !== track.visibility)
+            .map(({ value, label, Icon }) => (
+              <button
+                key={value}
+                type="button"
+                tabIndex={-1}
+                onClick={() => handleVisibilityChange(value)}
+                role="menuitem"
+                className={itemClass}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+              </button>
+            ))}
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={handleDownloadsToggle}
+            role="menuitem"
+            className={itemClass}
+          >
+            {downloadsEnabled ? (
+              <>
+                <span className="relative">
                   <Download className="w-4 h-4" />
-                  Enable Downloads
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => { setOpen(false); setShowCollaborators(true); }}
-              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-studio-dark text-left"
-            >
-              <Users className="w-4 h-4" />
-              Manage Collaborators
-            </button>
-            <button
-              onClick={() => { setOpen(false); setShowDeleteConfirm(true); }}
-              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-studio-dark text-red-400 text-left"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete Track
-            </button>
-          </div>
-        </>
+                  <X className="w-2.5 h-2.5 absolute -top-0.5 -right-0.5 text-red-400" />
+                </span>
+                Disable Downloads
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                Enable Downloads
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={() => { setOpen(false); setShowCollaborators(true); }}
+            role="menuitem"
+            className={itemClass}
+          >
+            <Users className="w-4 h-4" />
+            Manage Collaborators
+          </button>
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={() => { setOpen(false); setShowDeleteConfirm(true); }}
+            role="menuitem"
+            className={`${itemClass} text-red-400`}
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete Track
+          </button>
+        </div>
       )}
 
       {/* Manage Collaborators */}

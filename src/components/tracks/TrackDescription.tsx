@@ -8,7 +8,7 @@ interface TrackDescriptionProps {
 
 /**
  * Renders a track description with newlines preserved (lyrics, verse breaks).
- * Collapsed to 4 lines with a Show more/less toggle when it overflows.
+ * Collapsed to 2 lines on mobile (4 on sm+) with a Show more/less toggle when it overflows.
  */
 export function TrackDescription({ description, className }: TrackDescriptionProps) {
   const textRef = useRef<HTMLParagraphElement>(null);
@@ -38,7 +38,7 @@ export function TrackDescription({ description, className }: TrackDescriptionPro
         ref={textRef}
         className={cn(
           'text-sm text-studio-text-secondary whitespace-pre-wrap break-words',
-          !expanded && 'line-clamp-4'
+          !expanded && 'line-clamp-2 sm:line-clamp-4'
         )}
       >
         {description}

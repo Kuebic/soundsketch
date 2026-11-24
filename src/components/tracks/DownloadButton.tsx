@@ -42,13 +42,14 @@ export function DownloadButton({ versionId, disabled }: DownloadButtonProps) {
       size="sm"
       onClick={handleDownload}
       disabled={disabled || downloading}
+      aria-label={downloading ? 'Preparing download' : 'Download this version'}
     >
       {downloading ? (
         <Loader2 className="w-4 h-4 animate-spin" />
       ) : (
         <Download className="w-4 h-4" />
       )}
-      <span className="ml-1.5">Download</span>
+      <span className="hidden sm:inline">Download</span>
     </Button>
   );
 }

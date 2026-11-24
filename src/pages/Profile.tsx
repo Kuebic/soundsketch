@@ -8,8 +8,10 @@ import { Navbar } from '@/components/layout/Navbar';
 import { TrackCard } from '@/components/tracks/TrackCard';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { Loader2, Music, Upload, Share2, Pencil, Settings, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, Music, Upload, Share2, Pencil, Settings, AlertTriangle, ChevronDown, ChevronUp, LogOut } from 'lucide-react';
 import { TrackFilter } from '@/components/tracks/TrackFilter';
+
+const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-studio-accent focus-visible:ring-offset-2 focus-visible:ring-offset-studio-black';
 
 export function Profile() {
   const viewer = useQuery(api.users.viewer);
@@ -174,6 +176,18 @@ export function Profile() {
     }
   };
 
+  const [signingOut, setSigningOut] = useState(false);
+  const handleSignOut = async () => {
+    try {
+      setSigningOut(true);
+      await signOut();
+      navigate('/');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to sign out');
+      setSigningOut(false);
+    }
+  };
+
   const handleCancelPasswordChange = () => {
     setChangingPassword(false);
     setCurrentPassword('');
@@ -204,114 +218,135 @@ export function Profile() {
 
       <main className="container mx-auto px-4 py-12">
         {/* User Info */}
-        <div className="card mb-8 max-w-md">
-          {/* Name Section */}
-          {editingName ? (
-            <div className="space-y-3 mb-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Display Name</label>
-                <input
-                  type="text"
-                  value={nameInput}
-                  onChange={(e) => setNameInput(e.target.value)}
-                  className="input"
-                  maxLength={50}
-                  autoFocus
-                  disabled={savingName}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') void handleSaveName();
-                    if (e.key === 'Escape') handleCancelName();
-                  }}
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={() => void handleSaveName()} disabled={savingName || !nameInput.trim()}>
-                  {savingName ? 'Saving...' : 'Save'}
-                </Button>
-                <Button size="sm" variant="secondary" onClick={handleCancelName} disabled={savingName}>
-                  Cancel
-                </Button>
-              </div>
+        <div className="card hover:border-studio-gray hover:shadow-none mb-10 max-w-lg">
+          <div className="flex items-start gap-4">
+            <div
+              aria-hidden="true"
+              className="flex h-12 w-12 sm:h-14 sm:w-14 flex-shrink-0 items-center justify-center rounded-full border border-studio-accent/30 bg-studio-accent/15 font-mono text-lg sm:text-xl font-bold text-studio-accent"
+            >
+              {(viewer.name || viewer.email || '?').trim().charAt(0).toUpperCase()}
             </div>
-          ) : (
-            <div className="flex items-center gap-3 mb-4">
-              <h1 className="text-2xl font-bold">{viewer.name || 'Anonymous'}</h1>
-              <button
-                onClick={handleStartEditName}
-                className="p-1.5 hover:bg-studio-dark rounded-lg transition-colors text-studio-text-secondary hover:text-studio-accent"
-                title="Edit name"
-              >
-                <Pencil className="w-4 h-4" />
-              </button>
-            </div>
-          )}
 
-          {/* Email Section */}
-          {editingEmail ? (
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium mb-2">Email</label>
-                <input
-                  type="email"
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  className="input"
-                  autoFocus
-                  disabled={savingEmail}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') void handleSaveEmail();
-                    if (e.key === 'Escape') handleCancelEmail();
-                  }}
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={() => void handleSaveEmail()} disabled={savingEmail || !emailInput.trim()}>
-                  {savingEmail ? 'Saving...' : 'Save'}
-                </Button>
-                <Button size="sm" variant="secondary" onClick={handleCancelEmail} disabled={savingEmail}>
-                  Cancel
-                </Button>
-              </div>
+            <div className="min-w-0 flex-1">
+              {/* Name Section */}
+              {editingName ? (
+                <div className="space-y-3 mb-3">
+                  <div>
+                    <label htmlFor="profile-name" className="block text-sm font-medium mb-1.5">Display Name</label>
+                    <input
+                      id="profile-name"
+                      type="text"
+                      value={nameInput}
+                      onChange={(e) => setNameInput(e.target.value)}
+                      className="input"
+                      maxLength={50}
+                      autoFocus
+                      autoComplete="name"
+                      disabled={savingName}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') void handleSaveName();
+                        if (e.key === 'Escape') handleCancelName();
+                      }}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => void handleSaveName()} disabled={savingName || !nameInput.trim()}>
+                      {savingName ? 'Saving...' : 'Save'}
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={handleCancelName} disabled={savingName}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <h1 className="text-xl sm:text-2xl font-bold truncate">{viewer.name || 'Anonymous'}</h1>
+                  <button
+                    type="button"
+                    onClick={handleStartEditName}
+                    className={`flex-shrink-0 p-2 hover:bg-studio-dark rounded-lg transition-colors text-studio-text-secondary hover:text-studio-accent ${FOCUS_RING}`}
+                    title="Edit name"
+                    aria-label="Edit display name"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* Email Section */}
+              {editingEmail ? (
+                <div className="space-y-3 mt-2">
+                  <div>
+                    <label htmlFor="profile-email" className="block text-sm font-medium mb-1.5">Email</label>
+                    <input
+                      id="profile-email"
+                      type="email"
+                      value={emailInput}
+                      onChange={(e) => setEmailInput(e.target.value)}
+                      className="input"
+                      autoFocus
+                      autoComplete="email"
+                      disabled={savingEmail}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') void handleSaveEmail();
+                        if (e.key === 'Escape') handleCancelEmail();
+                      }}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => void handleSaveEmail()} disabled={savingEmail || !emailInput.trim()}>
+                      {savingEmail ? 'Saving...' : 'Save'}
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={handleCancelEmail} disabled={savingEmail}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 min-w-0">
+                  <p className="text-sm text-studio-text-secondary truncate">{viewer.email || 'No email set'}</p>
+                  <button
+                    type="button"
+                    onClick={handleStartEditEmail}
+                    className={`flex-shrink-0 p-2 hover:bg-studio-dark rounded-lg transition-colors text-studio-text-secondary hover:text-studio-accent ${FOCUS_RING}`}
+                    title="Edit email"
+                    aria-label="Edit email"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <p className="text-sm text-studio-text-secondary">{viewer.email || 'No email set'}</p>
-              <button
-                onClick={handleStartEditEmail}
-                className="p-1 hover:bg-studio-dark rounded-lg transition-colors text-studio-text-secondary hover:text-studio-accent"
-                title="Edit email"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
+          </div>
         </div>
 
         {/* My Tracks */}
         <section>
-          <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-            <h2 className="text-2xl font-semibold">
-              My Tracks
-              {myTracks && (
-                <span className="text-studio-text-secondary text-base ml-2">({myTracks.length})</span>
-              )}
-            </h2>
-            <div className="flex items-center gap-3">
-              {myTracks && myTracks.length >= 2 && (
-                <TrackFilter
-                  value={myTracksFilter}
-                  onChange={setMyTracksFilter}
-                  placeholder="Filter my tracks..."
-                />
-              )}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+            <div className="flex items-center justify-between gap-3 min-w-0 sm:contents">
+              <h2 className="text-xl sm:text-2xl font-semibold min-w-0 truncate sm:mr-auto">
+                My Tracks
+                {myTracks && (
+                  <span className="text-studio-text-secondary text-base ml-2">({myTracks.length})</span>
+                )}
+              </h2>
               <Link
                 to="/upload"
-                className="flex items-center gap-2 px-4 py-2 bg-studio-accent text-white rounded-lg text-sm font-medium hover:bg-studio-accent/90 transition-colors"
+                className={`sm:order-last shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 px-3.5 py-2 bg-studio-accent text-white rounded-lg text-sm font-medium hover:bg-studio-accent/90 transition-colors ${FOCUS_RING}`}
               >
                 <Upload className="w-4 h-4" />
                 Upload Track
               </Link>
             </div>
+            {myTracks && myTracks.length >= 2 && (
+              <div className="w-full sm:w-64 [&>div]:max-w-none">
+                <TrackFilter
+                  value={myTracksFilter}
+                  onChange={setMyTracksFilter}
+                  placeholder="Filter my tracks..."
+                />
+              </div>
+            )}
           </div>
 
           {myTracks === undefined ? (
@@ -348,20 +383,22 @@ export function Profile() {
 
         {/* Shared with Me */}
         <section className="mt-12">
-          <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-            <h2 className="text-2xl font-semibold flex items-center gap-2">
-              <Share2 className="w-6 h-6" />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+            <h2 className="text-xl sm:text-2xl font-semibold flex items-center gap-2">
+              <Share2 className="w-5 h-5 sm:w-6 sm:h-6" />
               Shared with Me
               {sharedTracks && (
                 <span className="text-studio-text-secondary text-base ml-2">({sharedTracks.length})</span>
               )}
             </h2>
             {sharedTracks && sharedTracks.length >= 2 && (
-              <TrackFilter
-                value={sharedFilter}
-                onChange={setSharedFilter}
-                placeholder="Filter shared tracks..."
-              />
+              <div className="w-full sm:w-64 [&>div]:max-w-none">
+                <TrackFilter
+                  value={sharedFilter}
+                  onChange={setSharedFilter}
+                  placeholder="Filter shared tracks..."
+                />
+              </div>
             )}
           </div>
 
@@ -393,8 +430,11 @@ export function Profile() {
         {/* Account Settings */}
         <section className="mt-12">
           <button
+            type="button"
             onClick={() => setSettingsExpanded(!settingsExpanded)}
-            className="flex items-center gap-2 text-studio-text-secondary hover:text-studio-text transition-colors"
+            aria-expanded={settingsExpanded}
+            aria-controls="account-settings-panel"
+            className={`flex items-center gap-2 rounded-lg text-studio-text-secondary hover:text-studio-text-primary transition-colors ${FOCUS_RING}`}
           >
             <Settings className="w-5 h-5" />
             <span className="text-lg font-medium">Account Settings</span>
@@ -406,7 +446,7 @@ export function Profile() {
           </button>
 
           {settingsExpanded && (
-            <div className="mt-4 space-y-4 max-w-md">
+            <div id="account-settings-panel" className="mt-4 space-y-4 max-w-lg">
               {/* Change Password */}
               <div className="card">
                 <h3 className="font-semibold mb-3">Change Password</h3>
@@ -416,6 +456,7 @@ export function Profile() {
                       <label className="block text-sm font-medium mb-2">Current Password</label>
                       <input
                         type="password"
+                        autoComplete="current-password"
                         value={currentPassword}
                         onChange={(e) => setCurrentPassword(e.target.value)}
                         className="input"
@@ -428,6 +469,7 @@ export function Profile() {
                       <label className="block text-sm font-medium mb-2">New Password</label>
                       <input
                         type="password"
+                        autoComplete="new-password"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         className="input"
@@ -442,6 +484,7 @@ export function Profile() {
                       <label className="block text-sm font-medium mb-2">Confirm New Password</label>
                       <input
                         type="password"
+                        autoComplete="new-password"
                         value={confirmNewPassword}
                         onChange={(e) => setConfirmNewPassword(e.target.value)}
                         className="input"
@@ -480,6 +523,26 @@ export function Profile() {
                     Change Password
                   </Button>
                 )}
+              </div>
+
+              {/* Sign Out */}
+              <div className="card hover:border-studio-gray hover:shadow-none flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <h3 className="font-semibold">Sign Out</h3>
+                  <p className="text-sm text-studio-text-secondary mt-0.5">
+                    End your session on this device.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void handleSignOut()}
+                  disabled={signingOut}
+                  className="shrink-0"
+                >
+                  {signingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+                  {signingOut ? 'Signing out...' : 'Sign Out'}
+                </Button>
               </div>
 
               {/* Danger Zone */}
@@ -588,7 +651,7 @@ export function Profile() {
               >
                 {deleting ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                     Deleting...
                   </>
                 ) : (

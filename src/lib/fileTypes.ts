@@ -58,6 +58,11 @@ export function validateUpload(file: File, purpose: UploadPurpose): string | nul
   return null;
 }
 
+/** Maximum allowed upload size in bytes for `purpose`. */
+export function maxUploadBytes(purpose: UploadPurpose): number {
+  return LIMITS[purpose].maxBytes;
+}
+
 /** Value for an <input type="file" accept> attribute. */
 export function acceptAttribute(purpose: UploadPurpose): string {
   return ALLOWED(purpose).map((ext) => `.${ext}`).join(',');

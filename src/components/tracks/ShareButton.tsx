@@ -19,9 +19,9 @@ export function ShareButton({ shareableId }: ShareButtonProps) {
   };
 
   return (
-    <Button variant="secondary" size="sm" onClick={handleCopy}>
-      <Link2 className="w-4 h-4 mr-1" />
-      Share
+    <Button variant="secondary" size="sm" onClick={handleCopy} aria-label="Copy share link">
+      <Link2 className="w-4 h-4" />
+      <span>Share</span>
     </Button>
   );
 }

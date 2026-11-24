@@ -149,7 +149,7 @@ export function AudioRecordingModal({
               <Button
                 variant="secondary"
                 onClick={reset}
-                className="flex-1 flex items-center justify-center gap-2"
+                className="flex-1"
               >
                 <RotateCcw className="w-4 h-4" />
                 Re-record
@@ -157,7 +157,7 @@ export function AudioRecordingModal({
               <Button
                 variant="primary"
                 onClick={handleUseRecording}
-                className="flex-1 flex items-center justify-center gap-2"
+                className="flex-1"
               >
                 <Check className="w-4 h-4" />
                 Use Recording

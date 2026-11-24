@@ -3,7 +3,46 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvex } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Button } from '../ui/Button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
+
+interface PasswordInputProps {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  autoComplete: 'current-password' | 'new-password';
+  disabled: boolean;
+  label: string;
+}
+
+function PasswordInput({ id, value, onChange, autoComplete, disabled, label }: PasswordInputProps) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="relative">
+      <input
+        id={id}
+        type={visible ? 'text' : 'password'}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="••••••••"
+        className="input pr-11"
+        autoComplete={autoComplete}
+        required
+        disabled={disabled}
+      />
+      <button
+        type="button"
+        onClick={() => setVisible((v) => !v)}
+        aria-label={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+        aria-pressed={visible}
+        aria-controls={id}
+        disabled={disabled}
+        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-studio-text-secondary transition-colors hover:text-studio-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-studio-accent disabled:opacity-50"
+      >
+        {visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+}
 
 function getFriendlyError(err: unknown, isSignUp: boolean): string {
   const message = err instanceof Error ? err.message : "";
@@ -113,14 +152,14 @@ export function LoginForm() {
   };
 
   return (
-    <div className="card max-w-md mx-auto">
-      <h2 className="text-2xl font-bold mb-6 text-center">
+    <div className="card max-w-md mx-auto hover:border-studio-gray hover:shadow-none">
+      <h2 className="text-xl sm:text-2xl font-bold mb-5 sm:mb-6 text-center">
         {isSignUp ? 'Create Account' : 'Welcome Back'}
       </h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">
+          <div role="alert" className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">
             {error}
           </div>
         )}
@@ -129,9 +168,13 @@ export function LoginForm() {
           <>
             {/* Username (required for signup) */}
             <div>
-              <label className="block text-sm font-medium mb-2">Username</label>
+              <label htmlFor="signup-username" className="block text-sm font-medium mb-1.5">Username</label>
               <input
+                id="signup-username"
                 type="text"
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="your_username"
@@ -148,11 +191,13 @@ export function LoginForm() {
 
             {/* Email (optional) */}
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Email <span className="text-studio-text-secondary">(optional)</span>
+              <label htmlFor="signup-email" className="block text-sm font-medium mb-1.5">
+                Email <span className="text-studio-text-secondary font-normal">(optional)</span>
               </label>
               <input
+                id="signup-email"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
@@ -166,28 +211,26 @@ export function LoginForm() {
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-medium mb-2">Password</label>
-              <input
-                type="password"
+              <label htmlFor="signup-password" className="block text-sm font-medium mb-1.5">Password</label>
+              <PasswordInput
+                id="signup-password"
+                label="Password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="input"
-                required
+                onChange={setPassword}
+                autoComplete="new-password"
                 disabled={loading}
               />
             </div>
 
             {/* Confirm Password */}
             <div>
-              <label className="block text-sm font-medium mb-2">Confirm Password</label>
-              <input
-                type="password"
+              <label htmlFor="signup-confirm-password" className="block text-sm font-medium mb-1.5">Confirm Password</label>
+              <PasswordInput
+                id="signup-confirm-password"
+                label="Confirm password"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-                className="input"
-                required
+                onChange={setConfirmPassword}
+                autoComplete="new-password"
                 disabled={loading}
               />
             </div>
@@ -196,9 +239,13 @@ export function LoginForm() {
           <>
             {/* Login: Username or Email */}
             <div>
-              <label className="block text-sm font-medium mb-2">Username or Email</label>
+              <label htmlFor="login-identifier" className="block text-sm font-medium mb-1.5">Username or Email</label>
               <input
+                id="login-identifier"
                 type="text"
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 placeholder="username or email"
@@ -210,14 +257,13 @@ export function LoginForm() {
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-medium mb-2">Password</label>
-              <input
-                type="password"
+              <label htmlFor="login-password" className="block text-sm font-medium mb-1.5">Password</label>
+              <PasswordInput
+                id="login-password"
+                label="Password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="input"
-                required
+                onChange={setPassword}
+                autoComplete="current-password"
                 disabled={loading}
               />
             </div>
@@ -226,12 +272,12 @@ export function LoginForm() {
 
         <Button
           type="submit"
-          className="w-full"
+          className="w-full !mt-6"
           disabled={loading}
         >
           {loading ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
+              <Loader2 className="w-4 h-4 animate-spin" />
               {isSignUp ? 'Creating Account...' : 'Logging In...'}
             </>
           ) : (
@@ -245,12 +291,13 @@ export function LoginForm() {
             setIsSignUp(!isSignUp);
             setError(null);
           }}
-          className="w-full text-sm text-studio-text-secondary hover:text-studio-text-primary transition-colors"
+          className="group w-full rounded-lg py-1.5 text-sm text-studio-text-secondary transition-colors hover:text-studio-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-studio-accent disabled:opacity-50"
           disabled={loading}
         >
-          {isSignUp
-            ? 'Already have an account? Log in'
-            : "Don't have an account? Sign up"}
+          {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+          <span className="font-medium text-studio-accent group-hover:underline underline-offset-4">
+            {isSignUp ? 'Log in' : 'Sign up'}
+          </span>
         </button>
       </form>
     </div>

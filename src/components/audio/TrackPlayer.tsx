@@ -4,8 +4,11 @@ import { useVersionStreamUrl } from '@/hooks/useSignedUrl';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { PlaybackControls } from './PlaybackControls';
 import { TimestampMarker } from '@/components/comments/TimestampMarker';
+import { formatDuration } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 import type { VersionId } from '@/types';
+
+const SKIP_SECONDS = 5;
 
 interface TimestampComment {
   id: string;
@@ -16,7 +19,8 @@ interface TimestampComment {
 
 interface TrackPlayerProps {
   versionId: VersionId;
-  onTimestampClick?: (timestamp: number) => void;
+  /** Asks the page to open a timestamp comment form at this time (seconds). */
+  onRequestComment?: (timestamp: number) => void;
   timestampComments?: TimestampComment[];
   seekToTime?: number | null;
   onSeekComplete?: () => void;
@@ -24,7 +28,7 @@ interface TrackPlayerProps {
 
 export function TrackPlayer({
   versionId,
-  onTimestampClick,
+  onRequestComment,
   timestampComments,
   seekToTime,
   onSeekComplete,
@@ -45,20 +49,17 @@ export function TrackPlayer({
     containerRef,
   });
 
-  // Keyboard shortcuts
-  const seekForward = useCallback(() => {
-    if (duration > 0) {
-      const newTime = Math.min(currentTime + 5, duration);
-      seekTo(newTime / duration);
-    }
-  }, [currentTime, duration, seekTo]);
-
-  const seekBackward = useCallback(() => {
-    if (duration > 0) {
-      const newTime = Math.max(currentTime - 5, 0);
-      seekTo(newTime / duration);
-    }
-  }, [currentTime, duration, seekTo]);
+  const seekBy = useCallback(
+    (delta: number) => {
+      if (duration > 0) {
+        const newTime = Math.min(Math.max(currentTime + delta, 0), duration);
+        seekTo(newTime / duration);
+      }
+    },
+    [currentTime, duration, seekTo]
+  );
+  const seekForward = useCallback(() => seekBy(SKIP_SECONDS), [seekBy]);
+  const seekBackward = useCallback(() => seekBy(-SKIP_SECONDS), [seekBy]);
 
   useKeyboardShortcuts({
     onPlayPause: playPause,
@@ -95,28 +96,30 @@ export function TrackPlayer({
     );
   }
 
-  return (
-    <div className="card space-y-6">
-      {/* Waveform with timestamp markers */}
-      <div className="relative">
-        <div
-          ref={containerRef}
-          className="waveform-container w-full cursor-pointer"
-          onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const progress = x / rect.width;
-            const timestamp = progress * duration;
-            onTimestampClick?.(timestamp);
-          }}
-        />
+  const commentAtLabel = `Comment at ${formatDuration(currentTime)}`;
 
-        {/* Timestamp comment markers overlay */}
-        {timestampComments && duration > 0 && (
-          <div className="absolute inset-0 pointer-events-none">
-            {timestampComments.map((tc) => (
-              <div key={tc.id} className="pointer-events-auto">
+  return (
+    <div className="card space-y-3 sm:space-y-4">
+      <div>
+        {/* Waveform with timestamp markers. Single click seeks (WaveSurfer native);
+            double-click opens a timestamp comment at that position. */}
+        <div className="relative">
+          <div
+            ref={containerRef}
+            className="waveform-container w-full cursor-pointer"
+            onDoubleClick={(e) => {
+              if (!onRequestComment || duration <= 0) return;
+              const rect = e.currentTarget.getBoundingClientRect();
+              const progress = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+              onRequestComment(progress * duration);
+            }}
+          />
+
+          {timestampComments && duration > 0 && (
+            <div className="absolute inset-0 pointer-events-none">
+              {timestampComments.map((tc) => (
                 <TimestampMarker
+                  key={tc.id}
                   timestamp={tc.timestamp}
                   duration={duration}
                   authorName={tc.authorName}
@@ -126,21 +129,32 @@ export function TrackPlayer({
                     if (!isPlaying) playPause();
                   }}
                 />
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Time at the waveform edges, with a micro-hint between them */}
+        <div className="mt-1.5 flex items-center justify-between gap-3 text-xs mono tabular-nums text-studio-text-secondary">
+          <span className="text-studio-text-primary">{formatDuration(currentTime)}</span>
+          {onRequestComment && (
+            <span className="hidden sm:block truncate font-body text-[11px] text-studio-text-secondary/70">
+              Double-click waveform to seek and comment, or press &ldquo;{commentAtLabel}&rdquo;
+            </span>
+          )}
+          <span>{formatDuration(duration)}</span>
+        </div>
       </div>
 
-      {/* Playback Controls */}
       <PlaybackControls
         isPlaying={isPlaying}
         currentTime={currentTime}
-        duration={duration}
         onPlayPause={playPause}
-        onSeek={seekTo}
+        onSkipBack={seekBackward}
+        onSkipForward={seekForward}
         onVolumeChange={setVolume}
         onPlaybackRateChange={setPlaybackRate}
+        onCommentAtCurrentTime={onRequestComment ? () => onRequestComment(currentTime) : undefined}
       />
     </div>
   );

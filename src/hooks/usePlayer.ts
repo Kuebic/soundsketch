@@ -18,6 +18,8 @@ export interface Player {
   /** Seek to a position in seconds. */
   seek: (seconds: number) => void;
   setVolume: (volume: number) => void;
+  /** Stop playback and clear the queue, hiding the player bar. */
+  close: () => void;
 }
 
 export const PlayerContext = createContext<Player | null>(null);

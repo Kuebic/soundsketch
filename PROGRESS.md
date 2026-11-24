@@ -130,71 +130,71 @@
 | Error boundaries | `react-error-boundary` in `src/App.tsx`, `src/pages/TrackPage.tsx` | Global + player-specific boundaries with themed fallbacks |
 | OG meta tags | `index.html` | Static OG/Twitter Card tags, description, theme-color, placeholder image |
 | Utility functions | `src/lib/utils.ts` | cn, formatDuration, formatFileSize, generateShareableLink, formatRelativeTime, getRecordingMimeType, mimeToExtension |
-| File-type registry | `src/lib/fileTypes.ts` | validateUpload(file, 'track' \| 'attachment'), acceptAttribute, attachmentKind, isLossless, extensionOf |
+| File-type registry | `src/lib/fileTypes.ts` | validateUpload(file, 'track' \| 'attachment'), maxUploadBytes, acceptAttribute, attachmentKind, isLossless, extensionOf |
 | Queue logic | `src/lib/queue.ts` | buildQueue(tracks, startTrackId), nextIndex, previousTarget (restart after 3s) |
-| Audio focus | `src/lib/audioFocus.ts` | claimAudioFocus/releaseAudioFocus — starting one player pauses the other (queue player vs. `useWaveform`) |
-| R2 upload | `src/lib/r2Upload.ts` | putToSignedUrl — XHR PUT with progress |
+| Audio focus | `src/lib/audioFocus.ts` | claimAudioFocus/releaseAudioFocus: starting one player pauses the other (queue player vs. `useWaveform`) |
+| R2 upload | `src/lib/r2Upload.ts` | putToSignedUrl: XHR PUT with progress |
 | Anonymous user utils | `src/lib/anonymousUser.ts` | generateAnonymousName, generateAnonymousId, getAnonymousIdentity (localStorage persistence) |
-| Optimistic updates | `src/lib/optimisticUpdates.ts` | `commentCreateOptimistic` — patches local query cache for instant comment appearance |
+| Optimistic updates | `src/lib/optimisticUpdates.ts` | `commentCreateOptimistic`: patches local query cache for instant comment appearance |
 | Type definitions | `src/types/index.ts` | Track, TrackForViewer, Version (client view), CommentThread, CommentView, id types |
 
 ### Hooks
 
 | Hook | Location | Purpose |
 |------|----------|---------|
-| `useWaveform` | `src/hooks/useWaveform.ts` | WaveSurfer.js lifecycle — play/pause, seek, volume, speed, cleanup; claims audio focus on play |
-| `usePlayer` | `src/hooks/usePlayer.ts` | App-wide queue player from `PlayerProvider`: queue, current, playFrom, toggle, next, previous, seek, setVolume |
+| `useWaveform` | `src/hooks/useWaveform.ts` | WaveSurfer.js lifecycle: play/pause, seek, volume, speed, cleanup; claims audio focus on play |
+| `usePlayer` | `src/hooks/usePlayer.ts` | App-wide queue player from `PlayerProvider`: queue, current, playFrom, toggle, next, previous, seek, setVolume, close |
 | `useVersionStreamUrl`, `useAttachmentUrl` | `src/hooks/useSignedUrl.ts` | Signed GET URLs by versionId / commentId, one shared 55-min cache; `loadCachedUrl` for the queue player (with `fresh` retry on expiry) |
-| `useFileUpload` | `src/hooks/useFileUpload.ts` | Full upload pipeline: validate → convert lossless (WAV/FLAC) to MP3 via ffmpeg.wasm → dual presigned URLs → XHR to R2 → save metadata. Exposes `stage` (idle/converting/uploading) for progress UI |
+| `useFileUpload` | `src/hooks/useFileUpload.ts` | Full upload pipeline: validate -> convert lossless (WAV/FLAC) to MP3 via ffmpeg.wasm -> dual presigned URLs -> XHR to R2 -> save metadata. Exposes `stage` (idle/converting/uploading) for progress UI |
 | `useAudioDuration` | `src/hooks/useAudioDuration.ts` | Extract duration from audio File via HTML5 Audio API |
-| `useAttachmentUpload` | `src/hooks/useAttachmentUpload.ts` | Attachment upload for a track: validate → presigned URL → XHR to R2 with progress |
-| `useKeyboardShortcuts` | `src/hooks/useKeyboardShortcuts.ts` | Spacebar play/pause, arrow key seeking (±5s), input-aware |
+| `useAttachmentUpload` | `src/hooks/useAttachmentUpload.ts` | Attachment upload for a track: validate -> presigned URL -> XHR to R2 with progress |
+| `useKeyboardShortcuts` | `src/hooks/useKeyboardShortcuts.ts` | Spacebar play/pause, arrow key seeking (+/-5s), ignores editable inputs, modifier combos, defaultPrevented events, and interactive ARIA widgets |
 | `useDebounce` | `src/hooks/useDebounce.ts` | Generic debounce hook for search input |
 | `useAnonymousIdentity` | `src/hooks/useAnonymousIdentity.ts` | Persistent anonymous identity (funny names like "sneaky-owl") from localStorage |
-| `useAudioRecording` | `src/hooks/useAudioRecording.ts` | Browser MediaRecorder API wrapper — mic access, record/stop, preview blob URL, file export |
+| `useAudioRecording` | `src/hooks/useAudioRecording.ts` | Browser MediaRecorder API wrapper: mic access, record/stop, preview blob URL, file export |
 
 ### Pages
 
 | Page | Route | Status |
 |------|-------|--------|
-| Home | `/` | Done — hero section + public tracks grid with search (title/creator, via URL `?q=` param); play from card queues the grid |
-| Login | `/login` | Done — email/password, sign in/sign up toggle |
-| Track Detail | `/track/:shareableId` | Done — player, versions, comments (w/ cross-version toggle), settings |
-| Upload | `/upload` | Done — file drop, form, progress bar, redirect |
-| Profile | `/profile` | Done — user info with inline name + email editing, track grid with privacy badges + filter, shared tracks section with filter, account settings with password change and delete account (two modes: anonymize comments or delete everything) |
+| Home | `/` | Done: compact hero section + public tracks grid (title/creator search via URL `?q=` param) + empty-state CTA; play from card queues the grid |
+| Login | `/login` | Done: email/password, sign in/sign up toggle, password visibility toggle, autocomplete attributes |
+| Track Detail | `/track/:shareableId` | Done: pinned version session state, waveform player with double-click / button timestamp commenting, comments (with accessible cross-version switch), settings menu |
+| Upload | `/upload` | Done: card-framed drop zone + form, accessible visibility radio group, progress bar, redirect |
+| Profile | `/profile` | Done: initial avatar card with inline name + email editing, responsive track header + full-width mobile filters, shared tracks section, account settings with password change, sign out, and two-mode account deletion |
 
 ### Components (28 total)
 
 | Component | Location | Status |
 |-----------|----------|--------|
-| Navbar | `src/components/layout/Navbar.tsx` | Done — logo, search bar, auth-conditional buttons |
-| SearchBar | `src/components/layout/SearchBar.tsx` | Done — debounced search input, URL param sync, hidden on mobile |
-| Button | `src/components/ui/Button.tsx` | Done — primary/secondary/danger, sm/md/lg |
-| Modal | `src/components/ui/Modal.tsx` | Done — backdrop blur, ESC close, responsive sizes |
-| ErrorFallback | `src/components/ui/ErrorFallback.tsx` | Done — full-page error boundary fallback |
-| PlayerErrorFallback | `src/components/ui/PlayerErrorFallback.tsx` | Done — inline audio player error fallback |
-| LoginForm | `src/components/auth/LoginForm.tsx` | Done — Convex Auth integration, username-based signup/login, optional email, password confirmation |
-| ClaimCommentsModal | `src/components/auth/ClaimCommentsModal.tsx` | Done — Modal to selectively claim anonymous comments after login/signup |
-| TrackPlayer | `src/components/audio/TrackPlayer.tsx` | Done — waveform + timestamp markers + external seek + keyboard shortcuts |
-| PlaybackControls | `src/components/audio/PlaybackControls.tsx` | Done — play/pause, progress, volume, speed |
-| PlayerProvider | `src/components/audio/PlayerProvider.tsx` | Done — owns the single `<audio>` for the queue; loads URLs per track, retries once with a fresh URL, toasts + skips on failure |
-| PlayerBar | `src/components/audio/PlayerBar.tsx` | Done — fixed bottom bar: seek, prev/play/next, title link, creator, time, volume; hidden until something plays |
-| TrackCard | `src/components/tracks/TrackCard.tsx` | Done — reusable card for Home + Profile; play/pause button (queues `list`), stretched link to the track, accent border when current |
-| TrackDescription | `src/components/tracks/TrackDescription.tsx` | Done — preserves newlines, 4-line preview with Show more/less when overflowing |
-| VersionSelector | `src/components/tracks/VersionSelector.tsx` | Done — dropdown with version names + dates |
-| ShareButton | `src/components/tracks/ShareButton.tsx` | Done — copies link to clipboard with toast |
-| TrackSettingsDropdown | `src/components/tracks/TrackSettingsDropdown.tsx` | Done — privacy toggle, delete, manage collaborators |
-| AddVersionModal | `src/components/tracks/AddVersionModal.tsx` | Done — file upload + version metadata |
-| ManageCollaboratorsModal | `src/components/tracks/ManageCollaboratorsModal.tsx` | Done — invite by email, list/remove collaborators |
-| CommentForm | `src/components/comments/CommentForm.tsx` | Done — text input, optional timestamp, file attachment, audio recording, @mention support |
-| CommentItem | `src/components/comments/CommentItem.tsx` | Done — display, edit, delete, reply, timestamp click, inline attachment previews (image thumbnail + lightbox, audio player), download, mention highlighting, anonymous user edit/delete authorization |
-| ImageLightbox | `src/components/comments/ImageLightbox.tsx` | Done — fullscreen image viewer with download button, ESC/backdrop close |
-| CommentList | `src/components/comments/CommentList.tsx` | Done — renders threads from `listThreads` |
-| TimestampMarker | `src/components/comments/TimestampMarker.tsx` | Done — waveform overlay markers |
-| MentionInput | `src/components/comments/MentionInput.tsx` | Done — textarea with @mention autocomplete dropdown |
-| AudioRecordingModal | `src/components/comments/AudioRecordingModal.tsx` | Done — record voice feedback via browser mic, preview, attach to comment |
-| TrackFilter | `src/components/tracks/TrackFilter.tsx` | Done — inline filter input for Profile page sections |
-| FileDropZone | `src/components/upload/FileDropZone.tsx` | Done — drag-drop + validation |
+| Navbar | `src/components/layout/Navbar.tsx` | Done: logo, search bar (with mobile overlay trigger), auth-conditional links, keyboard-accessible account menu (Profile + Sign Out) |
+| SearchBar | `src/components/layout/SearchBar.tsx` | Done: debounced search input, URL param sync, desktop inline bar + mobile overlay mode |
+| Button | `src/components/ui/Button.tsx` | Done: primary/secondary/danger, sm/md/lg, inline-flex icon/label alignment, focus-visible ring |
+| Modal | `src/components/ui/Modal.tsx` | Done: backdrop blur, ESC close, responsive sizes |
+| ErrorFallback | `src/components/ui/ErrorFallback.tsx` | Done: full-page error boundary fallback |
+| PlayerErrorFallback | `src/components/ui/PlayerErrorFallback.tsx` | Done: inline audio player error fallback |
+| LoginForm | `src/components/auth/LoginForm.tsx` | Done: Convex Auth integration, username-based signup/login, optional email, password visibility toggle |
+| ClaimCommentsModal | `src/components/auth/ClaimCommentsModal.tsx` | Done: modal to selectively claim anonymous comments after login/signup |
+| TrackPlayer | `src/components/audio/TrackPlayer.tsx` | Done: waveform + timestamp markers + single-click seek + double-click / button timestamp comment trigger + edge time readouts + keyboard shortcuts |
+| PlaybackControls | `src/components/audio/PlaybackControls.tsx` | Done: transport controls, Comment at timestamp CTA, speed cycler, desktop volume + mute memory |
+| PlayerProvider | `src/components/audio/PlayerProvider.tsx` | Done: owns shared `<audio>` for the queue; synchronous load cancellation via token on close/switch, retries once with fresh URL, toasts + skips on failure |
+| PlayerBar | `src/components/audio/PlayerBar.tsx` | Done: fixed bottom bar with custom pointer/keyboard `role="slider"` seek bar, prev/play/next, title link, mobile time readout, volume, close button |
+| TrackCard | `src/components/tracks/TrackCard.tsx` | Done: reusable card for Home + Profile; subtle lift hover, play/pause button (queues `list`), stretched link, accent border when current, creator + relative time + optional privacy badge |
+| TrackDescription | `src/components/tracks/TrackDescription.tsx` | Done: preserves newlines, responsive line-clamped preview (2 lines mobile, 4 lines `sm+`) with Show more/less when overflowing |
+| VersionSelector | `src/components/tracks/VersionSelector.tsx` | Done: custom accessible select chevron with version names + dates |
+| ShareButton | `src/components/tracks/ShareButton.tsx` | Done: copies link to clipboard with toast confirmation |
+| TrackSettingsDropdown | `src/components/tracks/TrackSettingsDropdown.tsx` | Done: WAI-ARIA keyboard menu (visibility, collaborators, delete) with outside-click and Tab dismissal |
+| AddVersionModal | `src/components/tracks/AddVersionModal.tsx` | Done: file upload + version metadata |
+| ManageCollaboratorsModal | `src/components/tracks/ManageCollaboratorsModal.tsx` | Done: invite by email, list/remove collaborators |
+| CommentForm | `src/components/comments/CommentForm.tsx` | Done: text input, optional timestamp badge (`at MM:SS`), file attachment, audio recording, @mention support |
+| CommentItem | `src/components/comments/CommentItem.tsx` | Done: display, edit, two-step inline delete confirmation (Escape-cancelable), reply, timestamp click, inline attachment previews (image thumbnail + lightbox, audio player), download, mention highlighting, anonymous edit/delete |
+| ImageLightbox | `src/components/comments/ImageLightbox.tsx` | Done: fullscreen image viewer with download button, ESC/backdrop close |
+| CommentList | `src/components/comments/CommentList.tsx` | Done: renders threads from `listThreads` |
+| TimestampMarker | `src/components/comments/TimestampMarker.tsx` | Done: waveform overlay markers clamped within edges, mobile-friendly touch hit target, focus-visible tooltip |
+| MentionInput | `src/components/comments/MentionInput.tsx` | Done: textarea with @mention autocomplete dropdown |
+| AudioRecordingModal | `src/components/comments/AudioRecordingModal.tsx` | Done: record voice feedback via browser mic, preview, attach to comment |
+| TrackFilter | `src/components/tracks/TrackFilter.tsx` | Done: inline filter input for Profile page sections |
+| FileDropZone | `src/components/upload/FileDropZone.tsx` | Done: keyboard-accessible drag-drop + format pills + `maxUploadBytes` limit display + validation |
 
 ### Routing (`src/App.tsx`)
 
