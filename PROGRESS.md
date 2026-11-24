@@ -139,7 +139,7 @@
 | R2 upload | `src/lib/r2Upload.ts` | putToSignedUrl: XHR PUT with progress |
 | Anonymous user utils | `src/lib/anonymousUser.ts` | generateAnonymousName, generateAnonymousId, getAnonymousIdentity (localStorage persistence) |
 | Optimistic updates | `src/lib/optimisticUpdates.ts` | `commentCreateOptimistic`: patches local query cache for instant comment appearance |
-| Type definitions | `src/types/index.ts` | Track, TrackForViewer, Version (client view), CommentThread, CommentView, id types |
+| Type definitions | `src/types/index.ts` | Track, TrackForViewer, PlaylistForViewer, PlaylistSummary, Version (client view), CommentThread, CommentView, id types |
 
 ### Hooks
 

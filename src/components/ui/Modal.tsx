@@ -60,7 +60,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', returnFoc
 
     if (panel && !panel.contains(document.activeElement)) {
       // A form's first visible field if there is one, otherwise the dialog itself.
-      const field = Array.from(panel.querySelectorAll<HTMLElement>('input, textarea')).find(isVisible);
+      const field = Array.from(panel.querySelectorAll<HTMLElement>('input:not([disabled]), textarea:not([disabled])')).find(isVisible);
       field?.focus();
       if (!panel.contains(document.activeElement)) panel.focus();
     }

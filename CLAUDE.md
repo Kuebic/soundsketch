@@ -24,7 +24,7 @@ A web app for musicians to share demo tracks with collaborators. Think SoundClou
 │   │   ├── auth/        # LoginForm
 │   │   ├── comments/    # CommentForm, CommentItem, CommentList, TimestampMarker
 │   │   ├── layout/      # Navbar
-│   │   ├── playlists/   # CreatePlaylistModal, AddToPlaylistModal, EditPlaylistModal, DeletePlaylistModal
+│   │   ├── playlists/   # CreatePlaylistModal, AddToPlaylistModal, AddToPlaylistButton, EditPlaylistModal, DeletePlaylistModal
 │   │   ├── tracks/      # TrackCard, VersionSelector, ShareButton, TrackSettingsDropdown, AddVersionModal
 │   │   ├── ui/          # Custom Button, Modal components
 │   │   └── upload/      # FileDropZone

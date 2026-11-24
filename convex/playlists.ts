@@ -204,7 +204,10 @@ export const moveTrack = mutation({
 
     const entries = await entriesOf(ctx, args.playlistId);
     const from = entries.findIndex((entry) => entry.trackId === args.trackId);
-    if (from === -1) throw new Error("Track is not in this playlist");
+    // An entry the owner has no role on is indistinguishable from an absent one.
+    if (from === -1 || !(await readTrack(ctx, args.trackId))) {
+      throw new Error("Track is not in this playlist");
+    }
 
     const step = args.direction === "up" ? -1 : 1;
     for (let i = from + step; i >= 0 && i < entries.length; i += step) {

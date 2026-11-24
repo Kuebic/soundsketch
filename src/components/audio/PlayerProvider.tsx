@@ -204,8 +204,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  /** False when the current item never loaded (its URL request failed). */
-  const hasMedia = useCallback(() => audio.hasAttribute('src'), [audio]);
+  /** False when the current item has nothing playable: its URL request or the media itself failed. */
+  const hasMedia = useCallback(() => audio.hasAttribute('src') && !audio.error, [audio]);
 
   const toggle = useCallback(() => {
     if (!currentRef.current) return;
@@ -255,6 +255,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     audio.pause();
     audio.removeAttribute('src');
     audio.load();
+    // load() discards the queued pause event.
+    setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
     setQueueState((s) => ({ queue: [], index: 0, playId: s.playId + 1, source: null, ended: false }));

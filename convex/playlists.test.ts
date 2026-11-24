@@ -141,6 +141,33 @@ describe("adding tracks to a playlist", () => {
     expect(playlist?.hiddenCount).toBe(0);
   });
 
+  test("an entry follows its track's latest version; a track with no audio has no duration", async () => {
+    const t = setup();
+    const owner = await signIn(t, "Owner");
+    const { playlistId, shareableId } = await owner.as.mutation(api.playlists.create, { title: "Demos" });
+    const song = await createTrack(owner.as, "Song", "public", 90);
+    const { trackId: silent } = await owner.as.mutation(api.tracks.create, { title: "Silent", visibility: "public" });
+    await owner.as.mutation(api.playlists.addTrack, { playlistId, trackId: song });
+    await owner.as.mutation(api.playlists.addTrack, { playlistId, trackId: silent });
+
+    const remix = await owner.as.mutation(api.versions.create, {
+      trackId: song,
+      versionName: "v2",
+      r2Key: `tracks/${song}/b-stream.mp3`,
+      fileName: "remix.mp3",
+      fileSize: 1,
+      fileFormat: "mp3",
+      duration: 200,
+    });
+
+    const playlist = await t.query(api.playlists.getByShareableId, { shareableId });
+    expect(playlist?.tracks).toMatchObject([
+      { title: "Song", latestVersionId: remix, duration: 200 },
+      { title: "Silent", duration: null },
+    ]);
+    expect(playlist?.tracks[1].latestVersionId).toBeUndefined();
+  });
+
   test("the owner can add their own, shared-with-them and public tracks", async () => {
     const t = setup();
     const owner = await signIn(t, "Owner");
@@ -409,6 +436,15 @@ describe("the owner edits a playlist", () => {
 
     expect(await titlesSeenBy(owner.as, shareableId)).toEqual(["B", "A"]);
     // The two swapped places; the entry between them stayed put.
+    expect(await titlesSeenBy(musician.as, shareableId)).toEqual(["B", "Lost", "A"]);
+
+    // The entry they cannot see is treated exactly like a track that is not there.
+    const { trackId: absent } = await owner.as.mutation(api.tracks.create, { title: "Absent" });
+    for (const trackId of [lost, absent]) {
+      await expect(
+        owner.as.mutation(api.playlists.moveTrack, { playlistId, trackId, direction: "down" }),
+      ).rejects.toThrow("Track is not in this playlist");
+    }
     expect(await titlesSeenBy(musician.as, shareableId)).toEqual(["B", "Lost", "A"]);
   });
 
