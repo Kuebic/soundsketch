@@ -246,6 +246,10 @@ describe("tracks in a playlist are resolved for each viewer", () => {
       expect(playlist?.tracks.map((track) => track.title)).toEqual(["Open", "Hush-hush", "Linked"]);
       expect(playlist?.hiddenCount).toBe(0);
     }
+    // Seeing a private track through a grant does not make the collaborator the playlist's owner.
+    expect(await collaborator.as.query(api.playlists.getByShareableId, { shareableId })).not.toHaveProperty(
+      "privateTracks",
+    );
   });
 
   test("strangers and signed-out guests get the rest, a hidden count, and nothing about the private track", async () => {
@@ -500,11 +504,16 @@ describe("the owner is told which tracks recipients may not hear", () => {
   });
 
   test("making a track unlisted clears it from the list; none left means an empty list", async () => {
-    const { owner, musician, shareableId, mine, theirs } = await playlistWithPrivateTracks();
+    const { t, owner, musician, shareableId, mine, theirs } = await playlistWithPrivateTracks();
 
     await owner.as.mutation(api.tracks.updateSettings, { trackId: mine, visibility: "unlisted" });
     const afterOne = await owner.as.query(api.playlists.getByShareableId, { shareableId });
     expect(afterOne?.privateTracks?.map((track) => track.title)).toEqual(["Their private"]);
+    // Unlisted, not public: reachable through the link, absent from Home.
+    expect(afterOne?.tracks.find((track) => track._id === mine)?.visibility).toBe("unlisted");
+    expect(await titlesSeenBy(t, shareableId)).toEqual(["Open", "My private", "Linked"]);
+    const onHome = await t.query(api.tracks.searchPublicTracks, { searchText: "" });
+    expect(onHome.map((track) => track.title)).toEqual(["Open"]);
 
     await musician.as.mutation(api.tracks.updateSettings, { trackId: theirs, visibility: "public" });
     const afterBoth = await owner.as.query(api.playlists.getByShareableId, { shareableId });

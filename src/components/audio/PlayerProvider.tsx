@@ -99,6 +99,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     // replaying the last track under this one's name.
     audio.removeAttribute('src');
     audio.load();
+    // load() discards the pause event queued above, so say it ourselves.
+    setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
 
@@ -202,31 +204,39 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  /** False when the current item never loaded (its URL request failed). */
+  const hasMedia = useCallback(() => audio.hasAttribute('src'), [audio]);
+
   const toggle = useCallback(() => {
     if (!currentRef.current) return;
+    if (!hasMedia()) {
+      // Nothing to resume: load the current item again.
+      setQueueState((s) => ({ ...s, playId: s.playId + 1, ended: false }));
+      return;
+    }
     if (audio.paused) audio.play().catch(() => {});
     else audio.pause();
-  }, [audio]);
+  }, [audio, hasMedia]);
 
   const previous = useCallback(() => {
     const target = previousTarget(index, audio.currentTime);
     if (target === 'restart') {
       audio.currentTime = 0;
       setCurrentTime(0);
-      setQueueState((s) => (s.ended ? { ...s, ended: false } : s));
+      if (hasMedia()) setQueueState((s) => (s.ended ? { ...s, ended: false } : s));
     } else {
       setQueueState((s) => ({ ...s, index: target, playId: s.playId + 1, ended: false }));
     }
-  }, [audio, index]);
+  }, [audio, hasMedia, index]);
 
   const seek = useCallback(
     (seconds: number) => {
       audio.currentTime = seconds;
       setCurrentTime(seconds);
       // Scrubbing back into a finished last track makes it resumable again.
-      setQueueState((s) => (s.ended ? { ...s, ended: false } : s));
+      if (hasMedia()) setQueueState((s) => (s.ended ? { ...s, ended: false } : s));
     },
-    [audio]
+    [audio, hasMedia]
   );
 
   const setVolume = useCallback(

@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from 'convex/react';
 import { toast } from 'sonner';
 import { AlertTriangle, ArrowDown, ArrowUp, EyeOff, ListMusic, Loader2, Pause, Pencil, Play, Trash2, X } from 'lucide-react';
@@ -28,9 +28,6 @@ export function PlaylistPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const navigate = useNavigate();
-  const location = useLocation();
-  const pathRef = useRef(location.pathname);
-  pathRef.current = location.pathname;
   const { shareableId } = useParams<{ shareableId: string }>();
   const playlist = useQuery(
     api.playlists.getByShareableId,
@@ -191,19 +188,23 @@ export function PlaylistPage() {
             <ul className="mt-3 space-y-2">
               {privateTracks.map((track) => (
                 <li key={track.trackId} className="flex items-center gap-3 text-sm">
-                  <span className="flex-1 min-w-0 truncate">{track.title}</span>
-                  {track.canMakeUnlisted ? (
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate">{track.title}</p>
+                    {!track.canMakeUnlisted && (
+                      <p className="text-xs text-studio-text-secondary break-words">
+                        Owned by {track.creatorName}. Ask them to share it, or remove it.
+                      </p>
+                    )}
+                  </div>
+                  {track.canMakeUnlisted && (
                     <Button
                       variant="secondary"
                       size="sm"
                       onClick={() => handleMakeUnlisted(track.trackId, track.title)}
+                      aria-label={`Make unlisted: ${track.title}`}
                     >
                       Make unlisted
                     </Button>
-                  ) : (
-                    <span className="shrink-0 text-xs text-studio-text-secondary">
-                      Owned by {track.creatorName}
-                    </span>
                   )}
                 </li>
               ))}
@@ -346,8 +347,10 @@ export function PlaylistPage() {
             playlist={playlist}
             onClose={() => setDeletingId(null)}
             onDeleted={() => {
-              // Only if the owner is still here; they may have left mid-delete.
-              if (pathRef.current === `/playlist/${playlist.shareableId}`) navigate('/profile');
+              // Only if the owner is still on this playlist; they may have left
+              // mid-delete, and this page may be unmounted by now.
+              const here = window.location.pathname.replace(/\/+$/, '');
+              if (here === `/playlist/${playlist.shareableId}`) navigate('/profile');
             }}
           />
         )}
