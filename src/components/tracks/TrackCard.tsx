@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, User, Lock, Globe, Link2, Play, Pause } from 'lucide-react';
+import { useConvexAuth } from 'convex/react';
+import { Clock, User, Lock, Globe, Link2, ListPlus, Play, Pause } from 'lucide-react';
 import { usePlayer } from '@/hooks/usePlayer';
+import { AddToPlaylistModal } from '@/components/playlists/AddToPlaylistModal';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import type { Track } from '@/types';
 
@@ -19,6 +22,8 @@ const visibilityBadge = {
 
 export function TrackCard({ track, list, showPrivacyBadge }: TrackCardProps) {
   const player = usePlayer();
+  const { isAuthenticated } = useConvexAuth();
+  const [addToPlaylistOpen, setAddToPlaylistOpen] = useState(false);
   const isCurrent = player.current?.trackId === track._id;
   const isPlaying = isCurrent && player.isPlaying;
   const canPlay = !!track.latestVersionId;
@@ -67,6 +72,18 @@ export function TrackCard({ track, list, showPrivacyBadge }: TrackCardProps) {
             <span className="truncate">{track.creatorName}</span>
           </p>
         </div>
+
+        {isAuthenticated && (
+          <button
+            type="button"
+            onClick={() => setAddToPlaylistOpen(true)}
+            aria-label={`Add ${track.title} to a playlist`}
+            title="Add to playlist"
+            className="relative z-10 shrink-0 -mr-1 -mt-1 p-2 rounded-lg text-studio-text-secondary hover:text-studio-accent hover:bg-studio-dark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-studio-accent"
+          >
+            <ListPlus className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {track.description && (
@@ -87,6 +104,12 @@ export function TrackCard({ track, list, showPrivacyBadge }: TrackCardProps) {
           </span>
         )}
       </div>
+
+      <AddToPlaylistModal
+        isOpen={addToPlaylistOpen}
+        onClose={() => setAddToPlaylistOpen(false)}
+        track={track}
+      />
     </div>
   );
 }

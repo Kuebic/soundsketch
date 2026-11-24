@@ -2,6 +2,29 @@ import { describe, expect, test } from "vitest";
 import { api } from "./_generated/api";
 import { setup, signIn } from "./test.setup";
 
+type Client = Awaited<ReturnType<typeof signIn>>["as"];
+type Visibility = "public" | "unlisted" | "private";
+
+/** A track with one version of the given length, so it has audio to play. */
+async function createTrack(owner: Client, title: string, visibility: Visibility, duration = 60) {
+  const { trackId } = await owner.mutation(api.tracks.create, { title, visibility });
+  await owner.mutation(api.versions.create, {
+    trackId,
+    versionName: "v1",
+    r2Key: `tracks/${trackId}/a-stream.mp3`,
+    fileName: "demo.mp3",
+    fileSize: 1,
+    fileFormat: "mp3",
+    duration,
+  });
+  return trackId;
+}
+
+async function titlesSeenBy(client: Pick<Client, "query">, shareableId: string) {
+  const playlist = await client.query(api.playlists.getByShareableId, { shareableId });
+  return playlist?.tracks.map((track) => track.title);
+}
+
 describe("creating a playlist", () => {
   test("a signed-in user creates a playlist and finds it among their playlists", async () => {
     const t = setup();
@@ -91,5 +114,166 @@ describe("opening a playlist by its link", () => {
     await owner.as.mutation(api.playlists.create, { title: "Demos" });
     expect(await t.query(api.tracks.searchPublicTracks, { searchText: "" })).toEqual([]);
     expect(await t.query(api.tracks.searchPublicTracks, { searchText: "Demos" })).toEqual([]);
+  });
+});
+
+describe("adding tracks to a playlist", () => {
+  test("tracks land at the end and are listed in that order with their durations", async () => {
+    const t = setup();
+    const owner = await signIn(t, "Owner");
+    const { playlistId, shareableId } = await owner.as.mutation(api.playlists.create, { title: "Demos" });
+    const first = await createTrack(owner.as, "First", "public", 90);
+    const second = await createTrack(owner.as, "Second", "unlisted", 45);
+
+    await owner.as.mutation(api.playlists.addTrack, { playlistId, trackId: first });
+    await owner.as.mutation(api.playlists.addTrack, { playlistId, trackId: second });
+
+    const playlist = await t.query(api.playlists.getByShareableId, { shareableId });
+    expect(playlist?.tracks).toMatchObject([
+      { _id: first, title: "First", creatorName: "Owner", duration: 90 },
+      { _id: second, title: "Second", creatorName: "Owner", duration: 45 },
+    ]);
+    expect(playlist?.hiddenCount).toBe(0);
+  });
+
+  test("the owner can add their own, shared-with-them and public tracks", async () => {
+    const t = setup();
+    const owner = await signIn(t, "Owner");
+    const friend = await signIn(t, "Friend");
+    const { playlistId, shareableId } = await owner.as.mutation(api.playlists.create, { title: "Mix" });
+    const own = await createTrack(owner.as, "Own private", "private");
+    const shared = await createTrack(friend.as, "Shared private", "private");
+    const reference = await createTrack(friend.as, "Public reference", "public");
+    await friend.as.mutation(api.tracks.grantAccess, { trackId: shared, userId: owner.userId });
+
+    for (const trackId of [own, shared, reference]) {
+      await owner.as.mutation(api.playlists.addTrack, { playlistId, trackId });
+    }
+
+    expect(await titlesSeenBy(owner.as, shareableId)).toEqual([
+      "Own private",
+      "Shared private",
+      "Public reference",
+    ]);
+  });
+
+  test("is rejected for non-owners, unviewable tracks and duplicates", async () => {
+    const t = setup();
+    const owner = await signIn(t, "Owner");
+    const stranger = await signIn(t, "Stranger");
+    const { playlistId, shareableId } = await owner.as.mutation(api.playlists.create, { title: "Mix" });
+    const track = await createTrack(owner.as, "Song", "public");
+    const secret = await createTrack(stranger.as, "Secret", "private");
+
+    await expect(
+      stranger.as.mutation(api.playlists.addTrack, { playlistId, trackId: track }),
+    ).rejects.toThrow("Not authorized");
+    await expect(t.mutation(api.playlists.addTrack, { playlistId, trackId: track })).rejects.toThrow(
+      "Not authenticated",
+    );
+    await expect(
+      owner.as.mutation(api.playlists.addTrack, { playlistId, trackId: secret }),
+    ).rejects.toThrow("Track not found");
+
+    await owner.as.mutation(api.playlists.addTrack, { playlistId, trackId: track });
+    await expect(
+      owner.as.mutation(api.playlists.addTrack, { playlistId, trackId: track }),
+    ).rejects.toThrow("already in this playlist");
+
+    expect(await titlesSeenBy(owner.as, shareableId)).toEqual(["Song"]);
+  });
+
+  test("a 101st track is rejected", async () => {
+    const t = setup();
+    const owner = await signIn(t, "Owner");
+    const { playlistId, shareableId } = await owner.as.mutation(api.playlists.create, { title: "Big" });
+    for (let i = 0; i < 100; i++) {
+      const { trackId } = await owner.as.mutation(api.tracks.create, { title: `Track ${i}` });
+      await owner.as.mutation(api.playlists.addTrack, { playlistId, trackId });
+    }
+    const { trackId: oneTooMany } = await owner.as.mutation(api.tracks.create, { title: "Track 100" });
+
+    await expect(
+      owner.as.mutation(api.playlists.addTrack, { playlistId, trackId: oneTooMany }),
+    ).rejects.toThrow("at most 100 tracks");
+    expect(await titlesSeenBy(owner.as, shareableId)).toHaveLength(100);
+  });
+
+  test("my playlists report how many tracks each holds", async () => {
+    const t = setup();
+    const owner = await signIn(t, "Owner");
+    const { playlistId } = await owner.as.mutation(api.playlists.create, { title: "Mix" });
+    await owner.as.mutation(api.playlists.create, { title: "Empty" });
+    for (const title of ["A", "B"]) {
+      const trackId = await createTrack(owner.as, title, "public");
+      await owner.as.mutation(api.playlists.addTrack, { playlistId, trackId });
+    }
+
+    const mine = await owner.as.query(api.playlists.getMyPlaylists, {});
+    expect(mine.map((p) => [p.title, p.trackCount])).toEqual([
+      ["Empty", 0],
+      ["Mix", 2],
+    ]);
+  });
+});
+
+describe("tracks in a playlist are resolved for each viewer", () => {
+  async function mixedPlaylist() {
+    const t = setup();
+    const owner = await signIn(t, "Owner");
+    const collaborator = await signIn(t, "Collab");
+    const stranger = await signIn(t, "Stranger");
+    const { playlistId, shareableId } = await owner.as.mutation(api.playlists.create, { title: "Mix" });
+    const open = await createTrack(owner.as, "Open", "public");
+    const secret = await createTrack(owner.as, "Hush-hush", "private", 77);
+    const linked = await createTrack(owner.as, "Linked", "unlisted");
+    await owner.as.mutation(api.tracks.grantAccess, { trackId: secret, userId: collaborator.userId });
+    for (const trackId of [open, secret, linked]) {
+      await owner.as.mutation(api.playlists.addTrack, { playlistId, trackId });
+    }
+    return { t, owner, collaborator, stranger, shareableId, secret };
+  }
+
+  test("the owner and a collaborator on the private track see every track", async () => {
+    const { owner, collaborator, shareableId } = await mixedPlaylist();
+    for (const client of [owner.as, collaborator.as]) {
+      const playlist = await client.query(api.playlists.getByShareableId, { shareableId });
+      expect(playlist?.tracks.map((track) => track.title)).toEqual(["Open", "Hush-hush", "Linked"]);
+      expect(playlist?.hiddenCount).toBe(0);
+    }
+  });
+
+  test("strangers and signed-out guests get the rest, a hidden count, and nothing about the private track", async () => {
+    const { t, stranger, shareableId, secret } = await mixedPlaylist();
+    for (const client of [stranger.as, t]) {
+      const playlist = await client.query(api.playlists.getByShareableId, { shareableId });
+      expect(playlist?.tracks.map((track) => track.title)).toEqual(["Open", "Linked"]);
+      expect(playlist?.hiddenCount).toBe(1);
+
+      const everything = JSON.stringify(playlist);
+      expect(everything).not.toContain("Hush-hush");
+      expect(everything).not.toContain(secret);
+      expect(playlist?.tracks.map((track) => track.duration)).toEqual([60, 60]);
+    }
+  });
+
+  test("a track made private after it was added drops out for guests", async () => {
+    const t = setup();
+    const owner = await signIn(t, "Owner");
+    const { playlistId, shareableId } = await owner.as.mutation(api.playlists.create, { title: "Mix" });
+    const trackId = await createTrack(owner.as, "Song", "public");
+    await owner.as.mutation(api.playlists.addTrack, { playlistId, trackId });
+    expect(await titlesSeenBy(t, shareableId)).toEqual(["Song"]);
+
+    await owner.as.mutation(api.tracks.updateSettings, { trackId, visibility: "private" });
+
+    expect(await titlesSeenBy(t, shareableId)).toEqual([]);
+    expect(await titlesSeenBy(owner.as, shareableId)).toEqual(["Song"]);
+  });
+
+  test("listed tracks never carry storage keys", async () => {
+    const { owner, shareableId } = await mixedPlaylist();
+    const playlist = await owner.as.query(api.playlists.getByShareableId, { shareableId });
+    expect(JSON.stringify(playlist)).not.toContain("a-stream.mp3");
   });
 });

@@ -425,6 +425,9 @@ export function Profile() {
                       {playlist.title}
                     </Link>
                   </h3>
+                  <p className="mono text-xs text-studio-text-secondary mt-1">
+                    {playlist.trackCount} {playlist.trackCount === 1 ? 'track' : 'tracks'}
+                  </p>
                   {playlist.description && (
                     <p className="text-sm text-studio-text-secondary mt-2 line-clamp-2">
                       {playlist.description}

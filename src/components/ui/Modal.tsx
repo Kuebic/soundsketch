@@ -1,4 +1,5 @@
 import { ReactNode, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -35,7 +36,9 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
     xl: 'max-w-4xl',
   };
 
-  return (
+  // Portalled to <body> so a transformed ancestor (a hovered card) cannot
+  // become the containing block of the fixed overlay.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
@@ -66,6 +69,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
         {/* Content */}
         <div className="p-6">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

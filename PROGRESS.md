@@ -92,13 +92,14 @@
 - **rateLimits** — key, timestamps (array). Index: by_key. Used for server-side rate limiting
 - **trackAccess** — trackId, userId, grantedBy, grantedAt. Indexes: by_track, by_user, by_track_and_user
 - **playlists** — title, description (optional), creatorId, creatorName, shareableId. Indexes: by_creator, by_shareable_id. Link-only: no visibility field (ADR 0003)
+- **playlistTracks** — playlistId, trackId, position. Indexes: by_playlist (playlistId, position), by_track. One row per track in a playlist; max 100 per playlist, no duplicates
 
 ### Convex Functions
 
 | File | Functions | Status |
 |------|-----------|--------|
 | `convex/tracks.ts` | create, searchPublicTracks, getByShareableId (returns `viewerRole`), updateSettings (title/description/visibility/downloads), getMyTracks, deleteTrack (cascades), grantAccess, revokeAccess, getCollaborators, getSharedWithMe | Done |
-| `convex/playlists.ts` | create, getMyPlaylists, getByShareableId (anyone with the link; returns `viewerRole`) | Done |
+| `convex/playlists.ts` | create, getMyPlaylists (with `trackCount`), getByShareableId (anyone with the link; returns `viewerRole`, the tracks this viewer has a role on in order with `duration`, and `hiddenCount` for the rest), addTrack (owner; must be able to view the track; no duplicates; max 100) | Done |
 | `convex/versions.ts` | create (rate-limited, validates R2 key prefix), getByTrack (access-checked, no storage keys), deleteVersion (cascades, re-points latestVersionId) | Done |
 | `convex/comments.ts` | listThreads (timestamped + general threads with nested replies and per-comment `canEdit`/`canDelete`), create (guest-friendly, replies attach to thread root, rate-limited), updateComment, deleteComment (cascades to replies + attachment), getAnonymousCommentsForClaiming, claimAnonymousComments (claim listed, decline rest) | Done |
 | `convex/storage.ts` | Internal queries that authorize file access and mint upload keys: versionStreamKey, versionDownloadKey, attachmentDownloadKey, newVersionKeys, newAttachmentKey | Done |
@@ -114,7 +115,7 @@
 
 ### Tests
 
-`npm test` (Vitest + convex-test, edge-runtime). `convex/access.test.ts` (visibility, guest identity, threads, storage keys), `convex/cascade.test.ts` (deletion, account deletion, claiming), `convex/playlists.test.ts` (playlist creation, link access, viewer role), `src/lib/fileTypes.test.ts`, `src/lib/queue.test.ts`. Shared helpers in `convex/test.setup.ts`.
+`npm test` (Vitest + convex-test, edge-runtime). `convex/access.test.ts` (visibility, guest identity, threads, storage keys), `convex/cascade.test.ts` (deletion, account deletion, claiming), `convex/playlists.test.ts` (playlist creation, link access, viewer role, adding tracks, per-viewer track visibility), `src/lib/fileTypes.test.ts`, `src/lib/queue.test.ts`. Shared helpers in `convex/test.setup.ts`.
 
 ---
 
@@ -162,18 +163,18 @@
 | Home | `/` | Done: compact hero section + public tracks grid (title/creator search via URL `?q=` param) + empty-state CTA; play from card queues the grid |
 | Login | `/login` | Done: email/password, sign in/sign up toggle, password visibility toggle, autocomplete attributes |
 | Track Detail | `/track/:shareableId` | Done: pinned version session state, waveform player with double-click / button timestamp commenting, comments (with accessible cross-version switch), settings menu |
-| Playlist | `/playlist/:shareableId` | Done: opens for anyone with the link; title, description, creator, share button (copies the playlist link), empty and not-found states. Renders owner copy from `viewerRole` |
+| Playlist | `/playlist/:shareableId` | Done: opens for anyone with the link; title, description, creator, track count + total duration, ordered track list (duration, link to track page), "N tracks unavailable" note, share button (copies the playlist link), empty and not-found states. Renders owner copy from `viewerRole` |
 | Upload | `/upload` | Done: card-framed drop zone + form, accessible visibility radio group, progress bar, redirect |
 | Profile | `/profile` | Done: initial avatar card with inline name + email editing, responsive track header + full-width mobile filters, Playlists section (create, open), shared tracks section, account settings with password change, sign out, and two-mode account deletion |
 
-### Components (29 total)
+### Components (30 total)
 
 | Component | Location | Status |
 |-----------|----------|--------|
 | Navbar | `src/components/layout/Navbar.tsx` | Done: logo, search bar (with mobile overlay trigger), auth-conditional links, keyboard-accessible account menu (Profile + Sign Out) |
 | SearchBar | `src/components/layout/SearchBar.tsx` | Done: debounced search input, URL param sync, desktop inline bar + mobile overlay mode |
 | Button | `src/components/ui/Button.tsx` | Done: primary/secondary/danger, sm/md/lg, inline-flex icon/label alignment, focus-visible ring |
-| Modal | `src/components/ui/Modal.tsx` | Done: backdrop blur, ESC close, responsive sizes |
+| Modal | `src/components/ui/Modal.tsx` | Done: portalled to `<body>`, backdrop blur, ESC close, responsive sizes |
 | ErrorFallback | `src/components/ui/ErrorFallback.tsx` | Done: full-page error boundary fallback |
 | PlayerErrorFallback | `src/components/ui/PlayerErrorFallback.tsx` | Done: inline audio player error fallback |
 | LoginForm | `src/components/auth/LoginForm.tsx` | Done: Convex Auth integration, username-based signup/login, optional email, password visibility toggle |
@@ -182,12 +183,13 @@
 | PlaybackControls | `src/components/audio/PlaybackControls.tsx` | Done: transport controls, Comment at timestamp CTA, speed cycler, desktop volume + mute memory |
 | PlayerProvider | `src/components/audio/PlayerProvider.tsx` | Done: owns shared `<audio>` for the queue; synchronous load cancellation via token on close/switch, retries once with fresh URL, toasts + skips on failure |
 | PlayerBar | `src/components/audio/PlayerBar.tsx` | Done: fixed bottom bar with custom pointer/keyboard `role="slider"` seek bar, prev/play/next, title link, mobile time readout, volume, close button |
-| TrackCard | `src/components/tracks/TrackCard.tsx` | Done: reusable card for Home + Profile; subtle lift hover, play/pause button (queues `list`), stretched link, accent border when current, creator + relative time + optional privacy badge |
+| TrackCard | `src/components/tracks/TrackCard.tsx` | Done: reusable card for Home + Profile; subtle lift hover, play/pause button (queues `list`), stretched link, "Add to playlist" button when signed in, accent border when current, creator + relative time + optional privacy badge |
 | TrackDescription | `src/components/tracks/TrackDescription.tsx` | Done: preserves newlines, responsive line-clamped preview (2 lines mobile, 4 lines `sm+`) with Show more/less when overflowing |
 | VersionSelector | `src/components/tracks/VersionSelector.tsx` | Done: custom accessible select chevron with version names + dates |
 | ShareButton | `src/components/tracks/ShareButton.tsx` | Done: copies a track or playlist link (`kind` prop) to clipboard with toast confirmation |
 | CreatePlaylistModal | `src/components/playlists/CreatePlaylistModal.tsx` | Done: title + optional description form; reports the new playlist via `onCreated` |
-| TrackSettingsDropdown | `src/components/tracks/TrackSettingsDropdown.tsx` | Done: WAI-ARIA keyboard menu (visibility, collaborators, delete) with outside-click and Tab dismissal |
+| AddToPlaylistModal | `src/components/playlists/AddToPlaylistModal.tsx` | Done: lists the user's playlists with track counts + "New playlist"; adds the given track. Opened from `TrackCard` and `TrackSettingsDropdown` |
+| TrackSettingsDropdown | `src/components/tracks/TrackSettingsDropdown.tsx` | Done: WAI-ARIA keyboard menu (visibility, downloads, collaborators, add to playlist, delete) with outside-click and Tab dismissal |
 | AddVersionModal | `src/components/tracks/AddVersionModal.tsx` | Done: file upload + version metadata |
 | ManageCollaboratorsModal | `src/components/tracks/ManageCollaboratorsModal.tsx` | Done: invite by email, list/remove collaborators |
 | CommentForm | `src/components/comments/CommentForm.tsx` | Done: text input, optional timestamp badge (`at MM:SS`), file attachment, audio recording, @mention support |

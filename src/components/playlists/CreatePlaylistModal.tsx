@@ -10,7 +10,7 @@ interface CreatePlaylistModalProps {
   isOpen: boolean;
   onClose: () => void;
   /** Called with the new playlist once it exists. */
-  onCreated?: (playlist: { playlistId: PlaylistId; shareableId: string }) => void;
+  onCreated?: (playlist: { playlistId: PlaylistId; shareableId: string; title: string }) => void;
 }
 
 export function CreatePlaylistModal({ isOpen, onClose, onCreated }: CreatePlaylistModalProps) {
@@ -39,7 +39,7 @@ export function CreatePlaylistModal({ isOpen, onClose, onCreated }: CreatePlayli
       setTitle('');
       setDescription('');
       onClose();
-      onCreated?.(created);
+      onCreated?.({ ...created, title: title.trim() });
     } catch {
       toast.error('Failed to create playlist');
       setSaving(false);

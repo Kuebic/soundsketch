@@ -108,4 +108,13 @@ export default defineSchema({
   })
     .index("by_creator", ["creatorId"])
     .index("by_shareable_id", ["shareableId"]),
+
+  // One row per track in a playlist. Entries are tracks, not versions.
+  playlistTracks: defineTable({
+    playlistId: v.id("playlists"),
+    trackId: v.id("tracks"),
+    position: v.number(), // ascending; gaps are fine
+  })
+    .index("by_playlist", ["playlistId", "position"])
+    .index("by_track", ["trackId"]), // lets a track delete find its entries
 });

@@ -6,7 +6,8 @@ import { api } from '../../../convex/_generated/api';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { ManageCollaboratorsModal } from './ManageCollaboratorsModal';
-import { Settings, Globe, Lock, Link2, Trash2, Users, Download, X } from 'lucide-react';
+import { AddToPlaylistModal } from '@/components/playlists/AddToPlaylistModal';
+import { Settings, Globe, Lock, Link2, ListPlus, Trash2, Users, Download, X } from 'lucide-react';
 import type { Track } from '@/types';
 
 interface TrackSettingsDropdownProps {
@@ -17,6 +18,7 @@ export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
   const [open, setOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showCollaborators, setShowCollaborators] = useState(false);
+  const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -180,6 +182,16 @@ export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
           <button
             type="button"
             tabIndex={-1}
+            onClick={() => { setOpen(false); setShowAddToPlaylist(true); }}
+            role="menuitem"
+            className={itemClass}
+          >
+            <ListPlus className="w-4 h-4" />
+            Add to Playlist
+          </button>
+          <button
+            type="button"
+            tabIndex={-1}
             onClick={() => { setOpen(false); setShowDeleteConfirm(true); }}
             role="menuitem"
             className={`${itemClass} text-red-400`}
@@ -195,6 +207,12 @@ export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
         isOpen={showCollaborators}
         onClose={() => setShowCollaborators(false)}
         trackId={track._id}
+      />
+
+      <AddToPlaylistModal
+        isOpen={showAddToPlaylist}
+        onClose={() => setShowAddToPlaylist(false)}
+        track={track}
       />
 
       {/* Delete confirmation */}
