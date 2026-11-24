@@ -250,6 +250,12 @@ export const deleteAccount = mutation({
       .collect();
     for (const grant of grants) await ctx.db.delete(grant._id);
 
+    const ownPlaylists = await ctx.db
+      .query("playlists")
+      .withIndex("by_creator", (q) => q.eq("creatorId", userId))
+      .collect();
+    for (const playlist of ownPlaylists) targets.push({ kind: "playlist", id: playlist._id });
+
     await cascadeDelete(ctx, targets);
     await deleteAuthRecords(ctx, userId);
     await ctx.db.delete(userId);

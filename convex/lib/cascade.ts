@@ -6,16 +6,21 @@ import type { MutationCtx } from "../_generated/server";
  * Ownership tree, and the only code that deletes from it:
  *
  *   user ─┬─ track ─┬─ version ── comment ── reply
- *         │         └─ trackAccess
+ *         │         ├─ trackAccess
+ *         │         └─ playlistTracks (its entries in anyone's playlists)
+ *         ├─ playlist ── playlistTracks
  *         └─ auth sessions / accounts
  *
  * Deleting a node deletes everything under it and schedules removal of every
  * R2 object those rows referenced. Callers must check authorization first.
+ * A playlist owns no tracks and no files: deleting one removes only its
+ * entries.
  */
 export type CascadeTarget =
   | { kind: "track"; id: Id<"tracks"> }
   | { kind: "version"; id: Id<"versions"> }
-  | { kind: "comment"; id: Id<"comments"> };
+  | { kind: "comment"; id: Id<"comments"> }
+  | { kind: "playlist"; id: Id<"playlists"> };
 
 export async function cascadeDelete(
   ctx: MutationCtx,
@@ -26,6 +31,7 @@ export async function cascadeDelete(
     if (target.kind === "track") await deleteTrack(ctx, target.id, keys);
     if (target.kind === "version") await deleteVersion(ctx, target.id, keys);
     if (target.kind === "comment") await deleteComment(ctx, target.id, keys);
+    if (target.kind === "playlist") await deletePlaylist(ctx, target.id);
   }
   await purgeObjects(ctx, keys);
 }
@@ -78,7 +84,26 @@ async function deleteTrack(ctx: MutationCtx, trackId: Id<"tracks">, keys: string
     .collect();
   for (const grant of grants) await ctx.db.delete(grant._id);
 
+  // Drop the track out of every playlist it was in; the playlists stay.
+  const entries = await ctx.db
+    .query("playlistTracks")
+    .withIndex("by_track", (q) => q.eq("trackId", trackId))
+    .collect();
+  for (const entry of entries) await ctx.db.delete(entry._id);
+
   await ctx.db.delete(trackId);
+}
+
+async function deletePlaylist(ctx: MutationCtx, playlistId: Id<"playlists">) {
+  if (!(await ctx.db.get(playlistId))) return;
+
+  const entries = await ctx.db
+    .query("playlistTracks")
+    .withIndex("by_playlist", (q) => q.eq("playlistId", playlistId))
+    .collect();
+  for (const entry of entries) await ctx.db.delete(entry._id);
+
+  await ctx.db.delete(playlistId);
 }
 
 async function deleteVersion(ctx: MutationCtx, versionId: Id<"versions">, keys: string[]) {

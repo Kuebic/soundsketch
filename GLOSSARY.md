@@ -32,4 +32,4 @@
 
 **Queue**: the tracks the listener will hear in order, taken from the track list where they pressed play (a page's track grid or a playlist), starting at the track they picked. Each track in the queue plays its latest version. The queue ends after the last track; it does not loop.
 
-**Cascade**: deleting a track, version or comment along with everything under it, including R2 files. Done only by `convex/lib/cascade.ts`.
+**Cascade**: deleting a track, version, comment or playlist along with everything under it, including R2 files. Deleting a track also removes it from every playlist; deleting a playlist removes only its entries, never its tracks. Done only by `convex/lib/cascade.ts`.

@@ -3,6 +3,7 @@ import type { Id } from "./_generated/dataModel";
 import { ConvexError, v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { readPlaylist, readTrack, requirePlaylist, requireTrack, requireUserId } from "./lib/access";
+import { cascadeDelete } from "./lib/cascade";
 import { randomId } from "./lib/storageKeys";
 
 const MAX_TRACKS = 100;
@@ -216,5 +217,16 @@ export const removeTrack = mutation({
     for (const entry of entries) {
       if (entry.trackId === args.trackId) await ctx.db.delete(entry._id);
     }
+  },
+});
+
+/**
+ * Delete a playlist and its entries. Its tracks are untouched.
+ */
+export const deletePlaylist = mutation({
+  args: { playlistId: v.id("playlists") },
+  handler: async (ctx, args) => {
+    await requirePlaylist(ctx, args.playlistId, "own");
+    await cascadeDelete(ctx, [{ kind: "playlist", id: args.playlistId }]);
   },
 });

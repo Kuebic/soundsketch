@@ -99,23 +99,23 @@
 | File | Functions | Status |
 |------|-----------|--------|
 | `convex/tracks.ts` | create, searchPublicTracks, getByShareableId (returns `viewerRole`), updateSettings (title/description/visibility/downloads), getMyTracks, deleteTrack (cascades), grantAccess, revokeAccess, getCollaborators, getSharedWithMe | Done |
-| `convex/playlists.ts` | create, getMyPlaylists (with `trackCount`), getByShareableId (anyone with the link; returns `viewerRole`, the tracks this viewer has a role on in order with `duration`, and `hiddenCount` for the rest), addTrack (owner; must be able to view the track; no duplicates; max 100; coded `ConvexError`s `already_in_playlist` / `playlist_full`), update (owner; title/description), moveTrack (owner; swaps with the nearest neighbour the owner can see; no-op at the ends), removeTrack (owner; track untouched) | Done |
+| `convex/playlists.ts` | create, getMyPlaylists (with `trackCount`), getByShareableId (anyone with the link; returns `viewerRole`, the tracks this viewer has a role on in order with `duration`, and `hiddenCount` for the rest), addTrack (owner; must be able to view the track; no duplicates; max 100; coded `ConvexError`s `already_in_playlist` / `playlist_full`), update (owner; title/description), moveTrack (owner; swaps with the nearest neighbour the owner can see; no-op at the ends), removeTrack (owner; track untouched), deletePlaylist (owner; cascades to its entries) | Done |
 | `convex/versions.ts` | create (rate-limited, validates R2 key prefix), getByTrack (access-checked, no storage keys), deleteVersion (cascades, re-points latestVersionId) | Done |
 | `convex/comments.ts` | listThreads (timestamped + general threads with nested replies and per-comment `canEdit`/`canDelete`), create (guest-friendly, replies attach to thread root, rate-limited), updateComment, deleteComment (cascades to replies + attachment), getAnonymousCommentsForClaiming, claimAnonymousComments (claim listed, decline rest) | Done |
 | `convex/storage.ts` | Internal queries that authorize file access and mint upload keys: versionStreamKey, versionDownloadKey, attachmentDownloadKey, newVersionKeys, newAttachmentKey | Done |
 | `convex/r2.ts` | Actions (Node): getVersionStreamUrl, getVersionDownloadUrl, getAttachmentUrl, getVersionUploadUrls, getAttachmentUploadUrl; internal deleteObjects | Done |
-| `convex/users.ts` | viewer, searchByEmail, getTrackParticipants (access-checked), updateName (propagates creatorName on tracks and playlists + comment authorName), checkUsernameAvailable, resolveLoginIdentifier, updateEmail, changePassword, deleteAccount (cascades; also removes auth sessions/accounts) | Done |
+| `convex/users.ts` | viewer, searchByEmail, getTrackParticipants (access-checked), updateName (propagates creatorName on tracks and playlists + comment authorName), checkUsernameAvailable, resolveLoginIdentifier, updateEmail, changePassword, deleteAccount (cascades, including owned playlists; also removes auth sessions/accounts) | Done |
 | `convex/auth.ts` | Convex Auth with Password provider, custom profile extracts name + username on signup | Done |
 | `convex/http.ts` | Auth HTTP routes | Done |
 | `convex/lib/access.ts` | Track access policy: readTrack/requireTrack, readVersion/requireVersion, requireUserId. Roles: owner, collaborator, guest. Playlist access: readPlaylist/requirePlaylist (anyone views, creator owns) | Done |
-| `convex/lib/cascade.ts` | cascadeDelete (track → versions → comments → replies, grants; schedules R2 purge), deleteAuthRecords | Done |
+| `convex/lib/cascade.ts` | cascadeDelete (track → versions → comments → replies, grants, playlist entries; playlist → its entries; schedules R2 purge), deleteAuthRecords | Done |
 | `convex/lib/storageKeys.ts` | randomId, versionKeys, attachmentKey, isVersionKeyFor, isAttachmentKeyFor | Done |
 | `convex/lib/r2Client.ts` | S3-compatible R2 client, generateUploadUrl, generateDownloadUrl, deleteObjects | Done |
 | `convex/lib/rateLimit.ts` | Reusable `checkRateLimit` helper — sliding window rate limiter backed by `rateLimits` table | Done |
 
 ### Tests
 
-`npm test` (Vitest + convex-test, edge-runtime). `convex/access.test.ts` (visibility, guest identity, threads, storage keys), `convex/cascade.test.ts` (deletion, account deletion, claiming), `convex/playlists.test.ts` (playlist creation, link access, viewer role, adding tracks, per-viewer track visibility, rename/reorder/remove and their permission checks), `src/lib/fileTypes.test.ts`, `src/lib/queue.test.ts`. Shared helpers in `convex/test.setup.ts`.
+`npm test` (Vitest + convex-test, edge-runtime). `convex/access.test.ts` (visibility, guest identity, threads, storage keys), `convex/cascade.test.ts` (deletion incl. playlists and playlist entries, account deletion, claiming), `convex/playlists.test.ts` (playlist creation, link access, viewer role, adding tracks, per-viewer track visibility, rename/reorder/remove and their permission checks), `src/lib/fileTypes.test.ts`, `src/lib/queue.test.ts`. Shared helpers in `convex/test.setup.ts`.
 
 ---
 
@@ -163,11 +163,11 @@
 | Home | `/` | Done: compact hero section + public tracks grid (title/creator search via URL `?q=` param) + empty-state CTA; play from card queues the grid |
 | Login | `/login` | Done: email/password, sign in/sign up toggle, password visibility toggle, autocomplete attributes |
 | Track Detail | `/track/:shareableId` | Done: pinned version session state, waveform player with double-click / button timestamp commenting, comments (with accessible cross-version switch), settings menu |
-| Playlist | `/playlist/:shareableId` | Done: opens for anyone with the link; title, description, creator, track count + total duration, Play button (queues the list from the first track with audio via `usePlayer().playFrom`; Pause/Resume while the queue was started here (`player.source`), still matches the list (`isQueueFrom`) and has not ended), ordered track list (per-row play from that track, now-playing mark, duration, link to track page), "N tracks unavailable" note, share button (copies the playlist link), empty and not-found states. Owner controls render from `viewerRole`: edit title/description, move a track up/down, remove a track |
+| Playlist | `/playlist/:shareableId` | Done: opens for anyone with the link; title, description, creator, track count + total duration, Play button (queues the list from the first track with audio via `usePlayer().playFrom`; Pause/Resume while the queue was started here (`player.source`), still matches the list (`isQueueFrom`) and has not ended), ordered track list (per-row play from that track, now-playing mark, duration, link to track page), "N tracks unavailable" note, share button (copies the playlist link), empty and not-found states. Owner controls render from `viewerRole`: edit title/description, move a track up/down, remove a track, delete the playlist (confirmation, then back to Profile) |
 | Upload | `/upload` | Done: card-framed drop zone + form, accessible visibility radio group, progress bar, redirect |
-| Profile | `/profile` | Done: initial avatar card with inline name + email editing, responsive track header + full-width mobile filters, Playlists section (create, open), shared tracks section, account settings with password change, sign out, and two-mode account deletion |
+| Profile | `/profile` | Done: initial avatar card with inline name + email editing, responsive track header + full-width mobile filters, Playlists section (create, open, delete with confirmation), shared tracks section, account settings with password change, sign out, and two-mode account deletion |
 
-### Components (33 total)
+### Components (34 total)
 
 | Component | Location | Status |
 |-----------|----------|--------|
@@ -189,6 +189,7 @@
 | ShareButton | `src/components/tracks/ShareButton.tsx` | Done: copies a track or playlist link (`kind` prop) to clipboard with toast confirmation |
 | CreatePlaylistModal | `src/components/playlists/CreatePlaylistModal.tsx` | Done: title + optional description form; reports the new playlist via `onCreated` |
 | EditPlaylistModal | `src/components/playlists/EditPlaylistModal.tsx` | Done: rename + edit description; mounted only while open |
+| DeletePlaylistModal | `src/components/playlists/DeletePlaylistModal.tsx` | Done: confirmation + delete; used by the playlist page and Profile |
 | AddToPlaylistButton | `src/components/playlists/AddToPlaylistButton.tsx` | Done: icon button owning its picker state; keyed by track on the track page |
 | AddToPlaylistModal | `src/components/playlists/AddToPlaylistModal.tsx` | Done: lists the user's playlists with track counts + "New playlist"; adds the given track. Opened from `TrackCard`, `TrackSettingsDropdown` (owner) and the track page header (other signed-in viewers) |
 | TrackSettingsDropdown | `src/components/tracks/TrackSettingsDropdown.tsx` | Done: WAI-ARIA keyboard menu (visibility, downloads, collaborators, add to playlist, delete) with outside-click and Tab dismissal |

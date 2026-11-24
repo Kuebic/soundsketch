@@ -24,10 +24,11 @@ A web app for musicians to share demo tracks with collaborators. Think SoundClou
 │   │   ├── auth/        # LoginForm
 │   │   ├── comments/    # CommentForm, CommentItem, CommentList, TimestampMarker
 │   │   ├── layout/      # Navbar
+│   │   ├── playlists/   # CreatePlaylistModal, AddToPlaylistModal, EditPlaylistModal, DeletePlaylistModal
 │   │   ├── tracks/      # TrackCard, VersionSelector, ShareButton, TrackSettingsDropdown, AddVersionModal
 │   │   ├── ui/          # Custom Button, Modal components
 │   │   └── upload/      # FileDropZone
-│   ├── pages/       # Home, Login, TrackPage, Upload, Profile
+│   ├── pages/       # Home, Login, TrackPage, PlaylistPage, Upload, Profile
 │   ├── hooks/       # useWaveform, useSignedUrl, useFileUpload, useAttachmentUpload, ...
 │   ├── lib/         # Convex client, fileTypes registry, r2Upload, utils
 │   └── types/       # Client view types derived from Convex function return types
@@ -46,10 +47,11 @@ Domain terms are defined in `GLOSSARY.md`. Decisions not to revisit are in `docs
 ### Access control (`convex/lib/access.ts`)
 - Every query/mutation/action that touches a track, version, comment or file goes through `readTrack`/`requireTrack` or `readVersion`/`requireVersion`. Never compare `creatorId` or query `trackAccess` by hand.
 - Roles: `owner`, `collaborator`, `guest` (public/unlisted viewer). Queries return null/empty for no access; mutations throw.
+- Playlists go through `readPlaylist`/`requirePlaylist` (anyone with the link views, the creator owns). A playlist link grants nothing on its tracks: each is still resolved with `readTrack` (ADR 0003).
 - The client never decides permissions: use `track.viewerRole` and each comment's `canEdit`/`canDelete` from `comments.listThreads`.
 
 ### Deletion (`convex/lib/cascade.ts`)
-- Delete tracks, versions and comments only via `cascadeDelete(ctx, targets)`. It removes child rows and schedules R2 cleanup. A new child table or file field → update `cascade.ts` and its test.
+- Delete tracks, versions, comments and playlists only via `cascadeDelete(ctx, targets)`. It removes child rows and schedules R2 cleanup. A new child table or file field → update `cascade.ts` and its test.
 
 ### R2 Integration Pattern (ADR 0001)
 - Clients never send or receive stored R2 keys. They ask for URLs by `versionId`/`commentId` (`r2.getVersionStreamUrl`, `r2.getAttachmentUrl`, ...); `convex/storage.ts` checks access and resolves the key.

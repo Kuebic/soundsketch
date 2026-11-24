@@ -8,9 +8,11 @@ import { Navbar } from '@/components/layout/Navbar';
 import { TrackCard } from '@/components/tracks/TrackCard';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { ListMusic, Loader2, Music, Plus, Upload, Share2, Pencil, Settings, AlertTriangle, ChevronDown, ChevronUp, LogOut } from 'lucide-react';
+import { ListMusic, Loader2, Music, Plus, Trash2, Upload, Share2, Pencil, Settings, AlertTriangle, ChevronDown, ChevronUp, LogOut } from 'lucide-react';
 import { TrackFilter } from '@/components/tracks/TrackFilter';
 import { CreatePlaylistModal } from '@/components/playlists/CreatePlaylistModal';
+import { DeletePlaylistModal } from '@/components/playlists/DeletePlaylistModal';
+import type { PlaylistSummary } from '@/types';
 
 const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-studio-accent focus-visible:ring-offset-2 focus-visible:ring-offset-studio-black';
 
@@ -24,6 +26,7 @@ export function Profile() {
   const sharedTracks = useQuery(api.tracks.getSharedWithMe);
   const myPlaylists = useQuery(api.playlists.getMyPlaylists);
   const [createPlaylistOpen, setCreatePlaylistOpen] = useState(false);
+  const [playlistToDelete, setPlaylistToDelete] = useState<PlaylistSummary | null>(null);
   const navigate = useNavigate();
   const { signOut } = useAuthActions();
 
@@ -417,14 +420,25 @@ export function Profile() {
                   key={playlist._id}
                   className="card relative transition-all duration-200 hover:-translate-y-0.5 hover:border-studio-accent/50"
                 >
-                  <h3 className="font-semibold text-lg leading-snug line-clamp-1">
-                    <Link
-                      to={`/playlist/${playlist.shareableId}`}
-                      className="after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-studio-accent"
+                  <div className="flex items-start gap-2">
+                    <h3 className="flex-1 min-w-0 font-semibold text-lg leading-snug line-clamp-1">
+                      <Link
+                        to={`/playlist/${playlist.shareableId}`}
+                        className="after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-studio-accent"
+                      >
+                        {playlist.title}
+                      </Link>
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setPlaylistToDelete(playlist)}
+                      aria-label={`Delete playlist ${playlist.title}`}
+                      title="Delete playlist"
+                      className={`relative z-10 shrink-0 -mr-1 -mt-1 p-2 rounded-lg text-studio-text-secondary hover:text-red-400 hover:bg-studio-dark transition-colors ${FOCUS_RING}`}
                     >
-                      {playlist.title}
-                    </Link>
-                  </h3>
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                   <p className="mono text-xs text-studio-text-secondary mt-1">
                     {playlist.trackCount} {playlist.trackCount === 1 ? 'track' : 'tracks'}
                   </p>
@@ -444,6 +458,14 @@ export function Profile() {
           onClose={() => setCreatePlaylistOpen(false)}
           onCreated={({ shareableId }) => navigate(`/playlist/${shareableId}`)}
         />
+
+        {playlistToDelete && (
+          <DeletePlaylistModal
+            key={playlistToDelete._id}
+            playlist={playlistToDelete}
+            onClose={() => setPlaylistToDelete(null)}
+          />
+        )}
 
         {/* Shared with Me */}
         <section className="mt-12">

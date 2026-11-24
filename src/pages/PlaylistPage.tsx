@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from 'convex/react';
 import { toast } from 'sonner';
-import { ArrowDown, ArrowUp, EyeOff, ListMusic, Loader2, Pause, Pencil, Play, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, EyeOff, ListMusic, Loader2, Pause, Pencil, Play, Trash2, X } from 'lucide-react';
 import { api } from '../../convex/_generated/api';
 import { Navbar } from '@/components/layout/Navbar';
 import { ShareButton } from '@/components/tracks/ShareButton';
 import { TrackDescription } from '@/components/tracks/TrackDescription';
+import { DeletePlaylistModal } from '@/components/playlists/DeletePlaylistModal';
 import { EditPlaylistModal } from '@/components/playlists/EditPlaylistModal';
 import { Button } from '@/components/ui/Button';
 import { usePlayer } from '@/hooks/usePlayer';
@@ -24,6 +25,8 @@ export function PlaylistPage() {
   // Holds the id of the playlist being edited, so the form cannot follow a
   // route change to another playlist.
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const navigate = useNavigate();
   const { shareableId } = useParams<{ shareableId: string }>();
   const playlist = useQuery(
     api.playlists.getByShareableId,
@@ -132,6 +135,18 @@ export function PlaylistPage() {
                   title="Edit playlist"
                 >
                   <Pencil className="w-4 h-4" />
+                </Button>
+              )}
+              {isOwner && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setDeletingId(playlist._id)}
+                  aria-label="Delete playlist"
+                  title="Delete playlist"
+                  className="hover:text-red-400"
+                >
+                  <Trash2 className="w-4 h-4" />
                 </Button>
               )}
             </div>
@@ -276,6 +291,13 @@ export function PlaylistPage() {
 
         {isOwner && editingId === playlist._id && (
           <EditPlaylistModal playlist={playlist} onClose={() => setEditingId(null)} />
+        )}
+        {isOwner && deletingId === playlist._id && (
+          <DeletePlaylistModal
+            playlist={playlist}
+            onClose={() => setDeletingId(null)}
+            onDeleted={() => navigate('/profile')}
+          />
         )}
       </main>
     </div>
