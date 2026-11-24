@@ -20,6 +20,11 @@ async function createTrack(owner: Client, title: string, visibility: Visibility,
   return trackId;
 }
 
+/** A ConvexError carrying this code. convex-test hands `data` over as its JSON text. */
+function coded(code: string) {
+  return { name: "ConvexError", data: expect.stringContaining(`"code":"${code}"`) };
+}
+
 async function titlesSeenBy(client: Pick<Client, "query">, shareableId: string) {
   const playlist = await client.query(api.playlists.getByShareableId, { shareableId });
   return playlist?.tracks.map((track) => track.title);
@@ -178,7 +183,7 @@ describe("adding tracks to a playlist", () => {
     await owner.as.mutation(api.playlists.addTrack, { playlistId, trackId: track });
     await expect(
       owner.as.mutation(api.playlists.addTrack, { playlistId, trackId: track }),
-    ).rejects.toThrow("already in this playlist");
+    ).rejects.toMatchObject(coded("already_in_playlist"));
 
     expect(await titlesSeenBy(owner.as, shareableId)).toEqual(["Song"]);
   });
@@ -195,7 +200,7 @@ describe("adding tracks to a playlist", () => {
 
     await expect(
       owner.as.mutation(api.playlists.addTrack, { playlistId, trackId: oneTooMany }),
-    ).rejects.toThrow("at most 100 tracks");
+    ).rejects.toMatchObject(coded("playlist_full"));
     expect(await titlesSeenBy(owner.as, shareableId)).toHaveLength(100);
   });
 

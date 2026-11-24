@@ -22,6 +22,8 @@ const INTERACTIVE_SELECTOR = [
   '[role="listbox"]',
   '[role="option"]',
   '[role="tab"]',
+  // A modal owns the keyboard while it is open.
+  '[role="dialog"]',
 ].join(',');
 
 export function useKeyboardShortcuts({

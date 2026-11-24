@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useRef } from 'react';
+import { ReactNode, RefObject, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -9,61 +9,100 @@ interface ModalProps {
   title?: string;
   children: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  /**
+   * Where focus goes when the dialog closes. Defaults to whatever had focus
+   * when it opened; pass this when that element will be gone by then (a menu
+   * item, a dialog this one replaces).
+   */
+  returnFocusTo?: RefObject<HTMLElement | null>;
 }
 
-export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Open dialogs, bottom to top. Only the top one answers the keyboard. */
+const openDialogs: symbol[] = [];
+let overflowBeforeLock = '';
+
+function isVisible(el: HTMLElement): boolean {
+  return el.getClientRects().length > 0;
+}
+
+export function Modal({ isOpen, onClose, title, children, size = 'md', returnFocusTo }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const returnFocusToRef = useRef(returnFocusTo);
+  returnFocusToRef.current = returnFocusTo;
+
+  // Note the opener while rendering the open transition: by the time effects
+  // run, an autoFocus field inside the dialog has already taken focus.
+  const openerRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
+  if (isOpen && !wasOpenRef.current) {
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }
+  wasOpenRef.current = isOpen;
 
   // While open: lock page scroll, close on ESC, keep Tab inside the dialog,
-  // and hand focus back to whatever opened it afterwards.
+  // and hand focus back afterwards.
   useEffect(() => {
     if (!isOpen) return;
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const id = Symbol('dialog');
     const panel = panelRef.current;
+    const isTop = () => openDialogs[openDialogs.length - 1] === id;
+
+    if (openDialogs.length === 0) {
+      overflowBeforeLock = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+    }
+    openDialogs.push(id);
+
     if (panel && !panel.contains(document.activeElement)) {
-      // A form's first field if there is one, otherwise the dialog itself.
-      (panel.querySelector<HTMLElement>('input, textarea') ?? panel).focus();
+      // A form's first visible field if there is one, otherwise the dialog itself.
+      const field = Array.from(panel.querySelectorAll<HTMLElement>('input, textarea')).find(isVisible);
+      field?.focus();
+      if (!panel.contains(document.activeElement)) panel.focus();
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isTop()) return;
       if (e.key === 'Escape') {
+        // Stop here so a dialog underneath does not close on the same press.
+        e.stopImmediatePropagation();
         onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab' || !panel) return;
-      const focusable = Array.from(
-        panel.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        )
-      );
+      const focusable = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(isVisible);
       if (focusable.length === 0) {
         e.preventDefault();
+        panel.focus();
         return;
       }
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       const active = document.activeElement;
-      if (e.shiftKey && (active === first || active === panel)) {
+      if (!panel.contains(active)) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && (active === first || active === panel)) {
         e.preventDefault();
         last.focus();
       } else if (!e.shiftKey && active === last) {
         e.preventDefault();
         first.focus();
-      } else if (!panel.contains(active)) {
-        e.preventDefault();
-        first.focus();
       }
     };
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-      opener?.focus();
+      const wasTop = isTop();
+      openDialogs.splice(openDialogs.indexOf(id), 1);
+      if (openDialogs.length === 0) document.body.style.overflow = overflowBeforeLock;
+      const target = returnFocusToRef.current?.current ?? openerRef.current;
+      if (wasTop && target?.isConnected) target.focus();
     };
   }, [isOpen]);
 

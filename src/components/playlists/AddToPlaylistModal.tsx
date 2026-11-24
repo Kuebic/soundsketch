@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState, type RefObject } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { ConvexError } from 'convex/values';
 import { toast } from 'sonner';
@@ -12,13 +12,25 @@ interface AddToPlaylistModalProps {
   isOpen: boolean;
   onClose: () => void;
   track: { _id: TrackId; title: string };
+  /** See Modal's returnFocusTo. Defaults to whatever had focus when the picker opened. */
+  returnFocusTo?: RefObject<HTMLElement | null>;
 }
 
 const rowClass =
   'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm hover:bg-studio-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-studio-accent';
 
 /** Pick one of the signed-in user's playlists, or start a new one, for a track. */
-export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModalProps) {
+export function AddToPlaylistModal({ isOpen, onClose, track, returnFocusTo }: AddToPlaylistModalProps) {
+  // The picker and the new-playlist form replace each other, so both return
+  // focus to the picker's opener rather than to a button inside the other.
+  const openerRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
+  if (isOpen && !wasOpenRef.current) {
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }
+  wasOpenRef.current = isOpen;
+  const focusTarget = returnFocusTo ?? openerRef;
+
   const playlists = useQuery(api.playlists.getMyPlaylists, isOpen ? {} : 'skip');
   const addTrack = useMutation(api.playlists.addTrack);
   const [adding, setAdding] = useState(false);
@@ -55,6 +67,7 @@ export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModa
     return (
       <CreatePlaylistModal
         isOpen={isOpen}
+        returnFocusTo={focusTarget}
         onClose={() => setCreating(false)}
         onCreated={({ playlistId, title }) => {
           setCreating(false);
@@ -65,7 +78,7 @@ export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModa
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Add to Playlist" size="sm">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Add to Playlist" size="sm" returnFocusTo={focusTarget}>
       <p className="text-sm text-studio-text-secondary mb-4 truncate">{track.title}</p>
       {playlists === undefined ? (
         <div className="flex items-center justify-center py-6">

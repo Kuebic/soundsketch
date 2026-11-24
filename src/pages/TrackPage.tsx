@@ -83,7 +83,8 @@ export function TrackPage() {
   );
 
   const isOwner = track?.viewerRole === 'owner';
-  const [addToPlaylistOpen, setAddToPlaylistOpen] = useState(false);
+  // Keyed by track so the picker cannot follow a route change to another track.
+  const [playlistPickerFor, setPlaylistPickerFor] = useState<string | null>(null);
 
   // Build timestamp markers for the player
   const playerTimestampComments = threads?.timestamped.map((c) => ({
@@ -155,7 +156,7 @@ export function TrackPage() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => setAddToPlaylistOpen(true)}
+                  onClick={() => setPlaylistPickerFor(track._id)}
                   aria-label="Add to playlist"
                   title="Add to playlist"
                 >
@@ -164,8 +165,8 @@ export function TrackPage() {
               )}
               {isOwner && <TrackSettingsDropdown track={track} />}
               <AddToPlaylistModal
-                isOpen={addToPlaylistOpen}
-                onClose={() => setAddToPlaylistOpen(false)}
+                isOpen={playlistPickerFor === track._id}
+                onClose={() => setPlaylistPickerFor(null)}
                 track={track}
               />
             </div>

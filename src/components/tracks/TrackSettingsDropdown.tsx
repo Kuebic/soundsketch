@@ -213,6 +213,7 @@ export function TrackSettingsDropdown({ track }: TrackSettingsDropdownProps) {
         isOpen={showAddToPlaylist}
         onClose={() => setShowAddToPlaylist(false)}
         track={track}
+        returnFocusTo={triggerRef}
       />
 
       {/* Delete confirmation */}

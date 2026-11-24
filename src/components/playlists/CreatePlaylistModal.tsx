@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type RefObject } from 'react';
 import { useMutation } from 'convex/react';
 import { toast } from 'sonner';
 import { api } from '../../../convex/_generated/api';
@@ -10,10 +10,12 @@ interface CreatePlaylistModalProps {
   isOpen: boolean;
   onClose: () => void;
   /** Called with the new playlist once it exists. */
+  /** See Modal's returnFocusTo. */
+  returnFocusTo?: RefObject<HTMLElement | null>;
   onCreated?: (playlist: { playlistId: PlaylistId; shareableId: string; title: string }) => void;
 }
 
-export function CreatePlaylistModal({ isOpen, onClose, onCreated }: CreatePlaylistModalProps) {
+export function CreatePlaylistModal({ isOpen, onClose, onCreated, returnFocusTo }: CreatePlaylistModalProps) {
   const createPlaylist = useMutation(api.playlists.create);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -47,7 +49,7 @@ export function CreatePlaylistModal({ isOpen, onClose, onCreated }: CreatePlayli
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="New Playlist" size="sm">
+    <Modal isOpen={isOpen} onClose={handleClose} title="New Playlist" size="sm" returnFocusTo={returnFocusTo}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="playlist-title" className="block text-sm font-medium mb-1.5">
